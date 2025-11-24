@@ -11,11 +11,14 @@ export default function handler(req, res) {
   }
 
   if (req.method === 'GET') {
-    const conversationId = req.query.id;
+    // Extract conversation ID from URL
+    // For Vercel dynamic routes, the parameter is in the URL path
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const pathParts = url.pathname.split('/');
+    const conversationId = pathParts[pathParts.length - 1];
     
     // Return a default conversation structure
     // In production, this would fetch from a database
-    // For now, return a valid structure even if conversation doesn't exist
     const conversation = {
       id: conversationId,
       created_at: new Date().toISOString(),

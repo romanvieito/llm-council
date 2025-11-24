@@ -14,7 +14,10 @@ export default function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    const conversationId = req.query.id;
+    // Extract conversation ID from URL
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const pathParts = url.pathname.split('/');
+    const conversationId = pathParts[pathParts.length - 3]; // -3 because last parts are 'message/stream'
     const { content } = req.body;
 
     // Send mock streaming events

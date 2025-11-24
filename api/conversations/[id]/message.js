@@ -11,7 +11,10 @@ export default function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    const conversationId = req.query.id;
+    // Extract conversation ID from URL
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const pathParts = url.pathname.split('/');
+    const conversationId = pathParts[pathParts.length - 2]; // -2 because last part is 'message'
     const { content } = req.body;
 
     // For now, return a mock response
