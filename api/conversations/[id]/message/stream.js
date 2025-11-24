@@ -1,3 +1,8 @@
+import fs from 'fs';
+import path from 'path';
+
+const DATA_DIR = path.join(process.cwd(), 'data', 'conversations');
+
 export default function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -21,44 +26,131 @@ export default function handler(req, res) {
     const conversationId = pathParts[pathParts.length - 3]; // -3 because last parts are 'message/stream'
     const { content } = req.body;
 
-    // Send mock streaming events
-    // In production, this would stream from the actual LLM council backend
-    const sendEvent = (type, data) => {
-      res.write(`data: ${JSON.stringify({ type, ...data })}\n\n`);
-    };
+    try {
+      const filePath = path.join(DATA_DIR, `${conversationId}.json`);
 
-    // Simulate the 3-stage process
-    sendEvent('stage1_start');
-    setTimeout(() => {
-      sendEvent('stage1_complete', {
-        data: {
-          responses: [
-            { model: 'model1', response: 'Mock response 1' },
-            { model: 'model2', response: 'Mock response 2' }
-          ]
-        }
+      if (!fs.existsSync(filePath)) {
+        res.write(`data: ${JSON.stringify({ type: 'error', message: 'Conversation not found' })}\n\n`);
+        res.end();
+        return;
+      }
+
+      // Load existing conversation
+      const conversation = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+      // Check if this is the first message to generate a title
+      const isFirstMessage = conversation.messages.length === 0;
+
+      // Add user message
+      conversation.messages.push({
+        role: 'user',
+        content: content
       });
 
-      sendEvent('stage2_start');
+      // Save conversation with user message
+      fs.writeFileSync(filePath, JSON.stringify(conversation, null, 2));
+
+      // Send mock streaming events
+      const sendEvent = (type, data) => {
+        res.write(`data: ${JSON.stringify({ type, ...data })}\n\n`);
+      };
+
+      // Simulate the 3-stage process
+      sendEvent('stage1_start');
       setTimeout(() => {
-        sendEvent('stage2_complete', {
-          data: { rankings: [] },
-          metadata: { label_to_model: {}, aggregate_rankings: {} }
-        });
-
-        sendEvent('stage3_start');
-        setTimeout(() => {
-          sendEvent('stage3_complete', {
-            data: {
-              final_answer: 'This is a mock streaming response. The actual LLM council backend needs to be connected.'
+        const stage1Data = {
+          responses: [
+            {
+              model: 'openai/gpt-5.1',
+              response: 'This is a mock response from the LLM Council. In production, this would contain the actual individual model responses from OpenAI GPT-5.1.'
+            },
+            {
+              model: 'google/gemini-3-pro-preview',
+              response: 'Mock response from Google Gemini 3.0 Pro Preview. The real implementation would process your query through multiple LLMs simultaneously.'
+            },
+            {
+              model: 'anthropic/claude-sonnet-4.5',
+              response: 'Mock response from Anthropic Claude Sonnet 4.5. Each model would provide its unique perspective and expertise on your question.'
+            },
+            {
+              model: 'x-ai/grok-4',
+              response: 'Mock response from xAI Grok-4. The council would then rank and synthesize these responses into a comprehensive final answer.'
             }
-          });
+          ]
+        };
 
-          sendEvent('complete');
-          res.end();
+        sendEvent('stage1_complete', { data: stage1Data });
+
+        sendEvent('stage2_start');
+        setTimeout(() => {
+          const stage2Data = {
+            rankings: [
+              {
+                model: 'openai/gpt-5.1',
+                ranking: 'Response A (OpenAI): Comprehensive and well-structured analysis with practical solutions. Response B (Google): Good coverage of key points with real examples. Response C (Anthropic): Concise but lacks implementation details. Response D (xAI): Solid foundation but could be more specific.',
+                parsed_ranking: ['Response A', 'Response B', 'Response D', 'Response C']
+              },
+              {
+                model: 'google/gemini-3-pro-preview',
+                ranking: 'Response B: Best overall balance of depth, examples, and accessibility. Response A: Very thorough but lengthy. Response D: Good structure with concrete examples. Response C: Too brief for such a complex topic.',
+                parsed_ranking: ['Response B', 'Response A', 'Response D', 'Response C']
+              }
+            ]
+          };
+
+          const metadata = {
+            label_to_model: {
+              'Response A': 'openai/gpt-5.1',
+              'Response B': 'google/gemini-3-pro-preview',
+              'Response C': 'anthropic/claude-sonnet-4.5',
+              'Response D': 'x-ai/grok-4'
+            },
+            aggregate_rankings: {
+              'Response B': 2,
+              'Response A': 3,
+              'Response D': 4,
+              'Response C': 6
+            }
+          };
+
+          sendEvent('stage2_complete', { data: stage2Data, metadata });
+
+          sendEvent('stage3_start');
+          setTimeout(() => {
+            const stage3Data = {
+              model: 'google/gemini-3-pro-preview',
+              response: 'This is a mock final synthesis from the LLM Council Chairman. In production, this would be a carefully crafted response that combines the best insights from all council members, considering their peer rankings and individual expertise. The Chairman would resolve any conflicts, eliminate redundancies, and present a coherent, comprehensive answer to your query. This streaming implementation saves all messages to the file system for persistence across serverless invocations.'
+            };
+
+            sendEvent('stage3_complete', { data: stage3Data });
+
+            // Update title if this was the first message
+            if (isFirstMessage) {
+              conversation.title = `Discussion: ${content.slice(0, 50)}${content.length > 50 ? '...' : ''}`;
+              sendEvent('title_complete', { data: { title: conversation.title } });
+            }
+
+            // Save complete assistant message to conversation
+            conversation.messages.push({
+              role: 'assistant',
+              stage1: stage1Data.responses,
+              stage2: stage2Data.rankings,
+              stage3: stage3Data
+            });
+
+            fs.writeFileSync(filePath, JSON.stringify(conversation, null, 2));
+
+            sendEvent('complete');
+            res.end();
+          }, 500);
         }, 500);
       }, 500);
-    }, 500);
+
+    } catch (error) {
+      console.error('Error processing streaming message:', error);
+      res.write(`data: ${JSON.stringify({ type: 'error', message: 'Failed to process message' })}\n\n`);
+      res.end();
+    }
 
     return;
   }
