@@ -16,7 +16,8 @@ export default function handler(req, res) {
   if (req.method === 'POST') {
     // Extract conversation ID from URL path
     // req.url is the pathname (e.g., '/api/conversations/123/message/stream')
-    const pathParts = req.url.split('/');
+    const urlPath = req.url.split('?')[0]; // Remove query string if present
+    const pathParts = urlPath.split('/');
     const conversationId = pathParts[pathParts.length - 3]; // -3 because last parts are 'message/stream'
     const { content } = req.body;
 

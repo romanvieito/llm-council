@@ -12,8 +12,9 @@ export default function handler(req, res) {
 
   if (req.method === 'GET') {
     // Extract conversation ID from URL path
-    // req.url is the pathname (e.g., '/api/conversations/123')
-    const pathParts = req.url.split('/');
+    // req.url is the pathname (e.g., '/api/conversations/123' or '/api/conversations/123?id=...')
+    const urlPath = req.url.split('?')[0]; // Remove query string if present
+    const pathParts = urlPath.split('/');
     const conversationId = pathParts[pathParts.length - 1];
     
     // Return a default conversation structure
