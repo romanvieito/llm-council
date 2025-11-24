@@ -1,4 +1,4 @@
-import { kv } from '@vercel/kv';
+import { db } from '../../../../database/db.js';
 
 export default async function handler(req, res) {
   // Set CORS headers
@@ -24,8 +24,8 @@ export default async function handler(req, res) {
       const conversationId = pathParts[pathParts.length - 3]; // -3 because last parts are 'message/stream'
       const { content } = req.body;
 
-      // Get existing conversation
-      const conversation = await kv.get(`conversation:${conversationId}`);
+      // Check if conversation exists
+      const conversation = await db.getConversation(conversationId);
       if (!conversation) {
         res.write(`data: ${JSON.stringify({ type: 'error', message: 'Conversation not found' })}\n\n`);
         res.end();
@@ -36,13 +36,7 @@ export default async function handler(req, res) {
       const isFirstMessage = conversation.messages.length === 0;
 
       // Add user message
-      conversation.messages.push({
-        role: 'user',
-        content: content
-      });
-
-      // Save conversation with user message
-      await kv.set(`conversation:${conversationId}`, conversation);
+      await db.addUserMessage(conversationId, content);
 
       // Send mock streaming events
       const sendEvent = (type, data) => {
@@ -98,19 +92,13 @@ export default async function handler(req, res) {
 
             // Update title if this was the first message
             if (isFirstMessage) {
-              conversation.title = `Discussion: ${content.slice(0, 50)}${content.length > 50 ? '...' : ''}`;
-              sendEvent('title_complete', { data: { title: conversation.title } });
+              const newTitle = `Discussion: ${content.slice(0, 50)}${content.length > 50 ? '...' : ''}`;
+              await db.updateConversationTitle(conversationId, newTitle);
+              sendEvent('title_complete', { data: { title: newTitle } });
             }
 
-            // Save complete assistant message to conversation
-            conversation.messages.push({
-              role: 'assistant',
-              stage1: stage1Data,
-              stage2: stage2Data,
-              stage3: stage3Data
-            });
-
-            await kv.set(`conversation:${conversationId}`, conversation);
+            // Add assistant message
+            await db.addAssistantMessage(conversationId, stage1Data, stage2Data, stage3Data);
 
             sendEvent('complete');
             res.end();
@@ -123,7 +111,7 @@ export default async function handler(req, res) {
 
     res.status(405).json({ error: 'Method not allowed' });
   } catch (error) {
-    console.error('KV operation failed:', error);
+    console.error('Database operation failed:', error);
     res.write(`data: ${JSON.stringify({ type: 'error', message: 'Database operation failed' })}\n\n`);
     res.end();
   }

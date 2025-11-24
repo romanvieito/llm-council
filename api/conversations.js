@@ -1,6 +1,4 @@
-import { kv } from '@vercel/kv';
-
-const CONVERSATIONS_LIST_KEY = 'conversations:list';
+import { db } from '../database/db.js';
 
 export default async function handler(req, res) {
   // Set CORS headers
@@ -16,52 +14,27 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      // Get list of conversation IDs
-      const conversationIds = await kv.smembers(CONVERSATIONS_LIST_KEY) || [];
-
-      // Get all conversations
-      const conversations = [];
-      for (const id of conversationIds) {
-        const conversation = await kv.get(`conversation:${id}`);
-        if (conversation) {
-          conversations.push({
-            id: conversation.id,
-            created_at: conversation.created_at,
-            title: conversation.title || 'New Conversation',
-            message_count: conversation.messages ? conversation.messages.length : 0
-          });
-        }
-      }
-
-      // Sort by creation time, newest first
-      conversations.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
+      const conversations = await db.listConversations();
       res.status(200).json(conversations);
       return;
     }
 
     if (req.method === 'POST') {
       const conversationId = crypto.randomUUID();
-      const conversation = {
-        id: conversationId,
-        created_at: new Date().toISOString(),
-        title: 'New Conversation',
+      const conversation = await db.createConversation(conversationId);
+
+      res.status(200).json({
+        id: conversation.id,
+        created_at: conversation.created_at.toISOString(),
+        title: conversation.title,
         messages: []
-      };
-
-      // Store conversation in KV
-      await kv.set(`conversation:${conversationId}`, conversation);
-
-      // Add to conversations list
-      await kv.sadd(CONVERSATIONS_LIST_KEY, conversationId);
-
-      res.status(200).json(conversation);
+      });
       return;
     }
 
     res.status(405).json({ error: 'Method not allowed' });
   } catch (error) {
-    console.error('KV operation failed:', error);
+    console.error('Database operation failed:', error);
     res.status(500).json({ error: 'Database operation failed' });
   }
 }

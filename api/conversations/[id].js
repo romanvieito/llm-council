@@ -1,4 +1,4 @@
-import { kv } from '@vercel/kv';
+import { db } from '../../database/db.js';
 
 export default async function handler(req, res) {
   // Set CORS headers
@@ -20,11 +20,14 @@ export default async function handler(req, res) {
       const pathParts = urlPath.split('/');
       const conversationId = pathParts[pathParts.length - 1];
 
-      const conversation = await kv.get(`conversation:${conversationId}`);
+      const conversation = await db.getConversation(conversationId);
       if (!conversation) {
         res.status(404).json({ error: 'Conversation not found' });
         return;
       }
+
+      // Convert timestamp to ISO string for consistency
+      conversation.created_at = conversation.created_at.toISOString();
 
       res.status(200).json(conversation);
       return;
@@ -32,7 +35,7 @@ export default async function handler(req, res) {
 
     res.status(405).json({ error: 'Method not allowed' });
   } catch (error) {
-    console.error('KV operation failed:', error);
+    console.error('Database operation failed:', error);
     res.status(500).json({ error: 'Database operation failed' });
   }
 }

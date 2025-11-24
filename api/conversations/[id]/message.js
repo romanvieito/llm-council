@@ -1,4 +1,4 @@
-import { kv } from '@vercel/kv';
+import { db } from '../../../database/db.js';
 
 export default async function handler(req, res) {
   // Set CORS headers
@@ -21,22 +21,18 @@ export default async function handler(req, res) {
       const conversationId = pathParts[pathParts.length - 2]; // -2 because last part is 'message'
       const { content } = req.body;
 
-      // Get existing conversation
-      const conversation = await kv.get(`conversation:${conversationId}`);
+      // Check if conversation exists
+      const conversation = await db.getConversation(conversationId);
       if (!conversation) {
         res.status(404).json({ error: 'Conversation not found' });
         return;
       }
 
       // Add user message
-      conversation.messages.push({
-        role: 'user',
-        content: content
-      });
+      await db.addUserMessage(conversationId, content);
 
       // Generate mock assistant response
       const mockAssistantMessage = {
-        role: 'assistant',
         stage1: {
           responses: [
             { model: 'openai/gpt-5.1', response: 'Mock response from GPT-5.1' },
@@ -64,23 +60,16 @@ export default async function handler(req, res) {
         }
       };
 
-      conversation.messages.push(mockAssistantMessage);
+      // Add assistant message
+      await db.addAssistantMessage(conversationId, mockAssistantMessage.stage1, mockAssistantMessage.stage2, mockAssistantMessage.stage3);
 
-      // Save updated conversation
-      await kv.set(`conversation:${conversationId}`, conversation);
-
-      res.status(200).json({
-        stage1: mockAssistantMessage.stage1,
-        stage2: mockAssistantMessage.stage2,
-        stage3: mockAssistantMessage.stage3,
-        metadata: mockAssistantMessage.metadata
-      });
+      res.status(200).json(mockAssistantMessage);
       return;
     }
 
     res.status(405).json({ error: 'Method not allowed' });
   } catch (error) {
-    console.error('KV operation failed:', error);
+    console.error('Database operation failed:', error);
     res.status(500).json({ error: 'Database operation failed' });
   }
 }
