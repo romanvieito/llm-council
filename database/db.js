@@ -2,10 +2,39 @@ import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL);
 
+// Initialize database schema if it doesn't exist
+async function initSchema() {
+  await sql`
+    CREATE TABLE IF NOT EXISTS conversations (
+      id UUID PRIMARY KEY,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      title TEXT NOT NULL DEFAULT 'New Conversation'
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS messages (
+      id SERIAL PRIMARY KEY,
+      conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+      role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+      content TEXT,
+      stage1 JSONB,
+      stage2 JSONB,
+      stage3 JSONB,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )
+  `;
+
+  // Create indexes
+  await sql`CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_conversations_created_at ON conversations(created_at DESC)`;
+}
+
 // Database operations
 export const db = {
   // Conversations
   async createConversation(id, title = 'New Conversation') {
+    await initSchema();
     const result = await sql`
       INSERT INTO conversations (id, title)
       VALUES (${id}, ${title})
@@ -15,6 +44,7 @@ export const db = {
   },
 
   async getConversation(id) {
+    await initSchema();
     const result = await sql`
       SELECT * FROM conversations WHERE id = ${id}
     `;
@@ -42,6 +72,7 @@ export const db = {
   },
 
   async listConversations() {
+    await initSchema();
     const result = await sql`
       SELECT
         c.id,
@@ -63,6 +94,7 @@ export const db = {
   },
 
   async updateConversationTitle(id, title) {
+    await initSchema();
     await sql`
       UPDATE conversations
       SET title = ${title}
@@ -72,6 +104,7 @@ export const db = {
 
   // Messages
   async addUserMessage(conversationId, content) {
+    await initSchema();
     await sql`
       INSERT INTO messages (conversation_id, role, content)
       VALUES (${conversationId}, 'user', ${content})
@@ -79,6 +112,7 @@ export const db = {
   },
 
   async addAssistantMessage(conversationId, stage1, stage2, stage3) {
+    await initSchema();
     await sql`
       INSERT INTO messages (conversation_id, role, stage1, stage2, stage3)
       VALUES (${conversationId}, 'assistant', ${JSON.stringify(stage1)}, ${JSON.stringify(stage2)}, ${JSON.stringify(stage3)})
