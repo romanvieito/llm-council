@@ -11,7 +11,7 @@ export default function handler(req, res) {
   }
 
   if (req.method === 'GET') {
-    res.status(200).json({ conversations: [] });
+    res.status(200).json([]);
     return;
   }
 
