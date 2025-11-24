@@ -1,7 +1,7 @@
-import fs from 'fs';
-import path from 'path';
-
-const DATA_DIR = path.join(process.cwd(), 'data', 'conversations');
+// In-memory store for Vercel serverless functions
+// Note: this won't persist across serverless invocations
+// TODO: Replace with Vercel KV or Postgres for persistence
+const conversations = {};
 
 export default function handler(req, res) {
   // Set CORS headers
@@ -22,20 +22,13 @@ export default function handler(req, res) {
     const pathParts = urlPath.split('/');
     const conversationId = pathParts[pathParts.length - 1];
 
-    try {
-      const filePath = path.join(DATA_DIR, `${conversationId}.json`);
-
-      if (!fs.existsSync(filePath)) {
-        res.status(404).json({ error: 'Conversation not found' });
-        return;
-      }
-
-      const conversation = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-      res.status(200).json(conversation);
-    } catch (error) {
-      console.error('Error reading conversation:', error);
-      res.status(500).json({ error: 'Failed to get conversation' });
+    const conversation = conversations[conversationId];
+    if (!conversation) {
+      res.status(404).json({ error: 'Conversation not found' });
+      return;
     }
+
+    res.status(200).json(conversation);
     return;
   }
 

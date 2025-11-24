@@ -1,14 +1,7 @@
-import fs from 'fs';
-import path from 'path';
-
-const DATA_DIR = path.join(process.cwd(), 'data', 'conversations');
-
-// Ensure data directory exists
-function ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-}
+// In-memory store for Vercel serverless functions
+// Note: this won't persist across serverless invocations
+// TODO: Replace with Vercel KV or Postgres for persistence
+const conversations = {};
 
 export default function handler(req, res) {
   // Set CORS headers
@@ -23,65 +16,34 @@ export default function handler(req, res) {
   }
 
   if (req.method === 'GET') {
-    try {
-      ensureDataDir();
+    // Return list of conversations as metadata
+    const list = Object.values(conversations).map(conv => ({
+      id: conv.id,
+      created_at: conv.created_at,
+      title: conv.title,
+      message_count: conv.messages ? conv.messages.length : 0
+    }));
 
-      // Read all conversation files
-      const conversations = [];
-      const files = fs.readdirSync(DATA_DIR);
+    // Sort by creation time, newest first
+    list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-      for (const filename of files) {
-        if (filename.endsWith('.json')) {
-          try {
-            const filePath = path.join(DATA_DIR, filename);
-            const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-
-            // Return metadata only
-            conversations.push({
-              id: data.id,
-              created_at: data.created_at,
-              title: data.title || 'New Conversation',
-              message_count: data.messages ? data.messages.length : 0
-            });
-          } catch (fileError) {
-            console.error(`Error reading conversation file ${filename}:`, fileError);
-            // Continue with other files
-          }
-        }
-      }
-
-      // Sort by creation time, newest first
-      conversations.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-      res.status(200).json(conversations);
-    } catch (error) {
-      console.error('Error listing conversations:', error);
-      res.status(500).json({ error: 'Failed to list conversations' });
-    }
+    res.status(200).json(list);
     return;
   }
 
   if (req.method === 'POST') {
-    try {
-      ensureDataDir();
+    const conversationId = crypto.randomUUID();
+    const conversation = {
+      id: conversationId,
+      created_at: new Date().toISOString(),
+      title: 'New Conversation',
+      messages: []
+    };
 
-      const conversationId = crypto.randomUUID();
-      const conversation = {
-        id: conversationId,
-        created_at: new Date().toISOString(),
-        title: 'New Conversation',
-        messages: []
-      };
+    // Store in memory (note: won't persist in serverless)
+    conversations[conversationId] = conversation;
 
-      // Save to file
-      const filePath = path.join(DATA_DIR, `${conversationId}.json`);
-      fs.writeFileSync(filePath, JSON.stringify(conversation, null, 2));
-
-      res.status(200).json(conversation);
-    } catch (error) {
-      console.error('Error creating conversation:', error);
-      res.status(500).json({ error: 'Failed to create conversation' });
-    }
+    res.status(200).json(conversation);
     return;
   }
 
