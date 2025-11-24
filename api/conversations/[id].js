@@ -11,10 +11,9 @@ export default function handler(req, res) {
   }
 
   if (req.method === 'GET') {
-    // Extract conversation ID from URL
-    // For Vercel dynamic routes, the parameter is in the URL path
-    const url = new URL(req.url, `http://${req.headers.host}`);
-    const pathParts = url.pathname.split('/');
+    // Extract conversation ID from URL path
+    // req.url is the pathname (e.g., '/api/conversations/123')
+    const pathParts = req.url.split('/');
     const conversationId = pathParts[pathParts.length - 1];
     
     // Return a default conversation structure
