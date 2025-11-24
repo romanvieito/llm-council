@@ -54,7 +54,7 @@ export default function ChatInterface({
         {conversation.messages.length === 0 ? (
           <div className="empty-state">
             <h2>Start a conversation</h2>
-            <p>Ask a question to consult the LLM Council</p>
+            <p>Ask a question to consult Ava</p>
           </div>
         ) : (
           conversation.messages.map((msg, index) => (
