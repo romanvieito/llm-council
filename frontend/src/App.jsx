@@ -17,10 +17,10 @@ function App() {
 
   // Load conversation details when selected
   useEffect(() => {
-    if (currentConversationId) {
+    if (currentConversationId && (!currentConversation || currentConversation.id !== currentConversationId)) {
       loadConversation(currentConversationId);
     }
-  }, [currentConversationId]);
+  }, [currentConversationId, currentConversation]);
 
   const loadConversations = async () => {
     try {
