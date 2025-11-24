@@ -4,8 +4,16 @@ import json
 
 def handler(event, context):
     """API handler for LLM Council endpoints."""
-    path = event.get('path', '')
+    # For Vercel API routes, the path is relative to the function location
+    # Since this is api/index.py, it handles /api/* routes
+    # The path in event might be just the part after /api/
+    full_path = event.get('path', '')
     method = event.get('httpMethod', 'GET')
+
+    # Extract the path part after /api/
+    path = full_path.replace('/api', '') if full_path.startswith('/api') else full_path
+    if not path or path == '/':
+        path = '/conversations'  # Default to conversations endpoint
 
     # CORS headers
     headers = {
@@ -24,7 +32,7 @@ def handler(event, context):
         }
 
     # Route different endpoints
-    if path == '/api/conversations':
+    if path == '/conversations':
         if method == 'GET':
             # List conversations
             return {
@@ -47,12 +55,15 @@ def handler(event, context):
                 })
             }
 
-    # Default response for unmatched routes
+    # Debug response for unmatched routes
     return {
-        "statusCode": 404,
+        "statusCode": 200,
         "headers": headers,
         "body": json.dumps({
-            "error": "Not Found",
-            "message": f"Endpoint {method} {path} not found"
+            "debug": True,
+            "full_path": full_path,
+            "path": path,
+            "method": method,
+            "message": f"Debug: Endpoint {method} {path} (full: {full_path})"
         })
     }
