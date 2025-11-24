@@ -10,8 +10,5 @@
         { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
       ]
     }
-  ],
-  "kv": {
-    "databaseId": "llm-council-db"
-  }
+  ]
 }
