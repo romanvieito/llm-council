@@ -48,6 +48,7 @@ function App() {
         ...conversations,
       ]);
       setCurrentConversationId(newConv.id);
+      setCurrentConversation(newConv); // Set the conversation directly to avoid the separate API call
     } catch (error) {
       console.error('Failed to create conversation:', error);
     }
