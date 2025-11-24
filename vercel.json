@@ -10,10 +10,7 @@
     },
     {
       "src": "api/index.py",
-      "use": "@vercel/python",
-      "config": {
-        "runtime": "python3.12"
-      }
+      "use": "@vercel/python"
     }
   ],
   "routes": [
@@ -25,10 +22,5 @@
       "src": "/(.*)",
       "dest": "/frontend/dist/$1"
     }
-  ],
-  "functions": {
-    "api/index.py": {
-      "runtime": "python3.12"
-    }
-  }
+  ]
 }
