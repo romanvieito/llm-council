@@ -1,9 +1,6 @@
-// In-memory store for Vercel serverless functions
-// Note: this won't persist across serverless invocations
-// TODO: Replace with Vercel KV or Postgres for persistence
-const conversations = {};
+import { kv } from '@vercel/kv';
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -15,22 +12,27 @@ export default function handler(req, res) {
     return;
   }
 
-  if (req.method === 'GET') {
-    // Extract conversation ID from URL path
-    // req.url is the pathname (e.g., '/api/conversations/123' or '/api/conversations/123?id=...')
-    const urlPath = req.url.split('?')[0]; // Remove query string if present
-    const pathParts = urlPath.split('/');
-    const conversationId = pathParts[pathParts.length - 1];
+  try {
+    if (req.method === 'GET') {
+      // Extract conversation ID from URL path
+      // req.url is the pathname (e.g., '/api/conversations/123' or '/api/conversations/123?id=...')
+      const urlPath = req.url.split('?')[0]; // Remove query string if present
+      const pathParts = urlPath.split('/');
+      const conversationId = pathParts[pathParts.length - 1];
 
-    const conversation = conversations[conversationId];
-    if (!conversation) {
-      res.status(404).json({ error: 'Conversation not found' });
+      const conversation = await kv.get(`conversation:${conversationId}`);
+      if (!conversation) {
+        res.status(404).json({ error: 'Conversation not found' });
+        return;
+      }
+
+      res.status(200).json(conversation);
       return;
     }
 
-    res.status(200).json(conversation);
-    return;
+    res.status(405).json({ error: 'Method not allowed' });
+  } catch (error) {
+    console.error('KV operation failed:', error);
+    res.status(500).json({ error: 'Database operation failed' });
   }
-
-  res.status(405).json({ error: 'Method not allowed' });
 }

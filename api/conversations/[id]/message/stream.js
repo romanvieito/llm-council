@@ -1,4 +1,6 @@
-export default function handler(req, res) {
+import { kv } from '@vercel/kv';
+
+export default async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -13,38 +15,57 @@ export default function handler(req, res) {
     return;
   }
 
-  if (req.method === 'POST') {
-    // Extract conversation ID from URL path
-    // req.url is the pathname (e.g., '/api/conversations/123/message/stream')
-    const urlPath = req.url.split('?')[0]; // Remove query string if present
-    const pathParts = urlPath.split('/');
-    const conversationId = pathParts[pathParts.length - 3]; // -3 because last parts are 'message/stream'
-    const { content } = req.body;
+  try {
+    if (req.method === 'POST') {
+      // Extract conversation ID from URL path
+      // req.url is the pathname (e.g., '/api/conversations/123/message/stream')
+      const urlPath = req.url.split('?')[0]; // Remove query string if present
+      const pathParts = urlPath.split('/');
+      const conversationId = pathParts[pathParts.length - 3]; // -3 because last parts are 'message/stream'
+      const { content } = req.body;
 
-    // Send mock streaming events
-    // In production, this would stream from the actual LLM council backend
-    const sendEvent = (type, data) => {
-      res.write(`data: ${JSON.stringify({ type, ...data })}\n\n`);
-    };
+      // Get existing conversation
+      const conversation = await kv.get(`conversation:${conversationId}`);
+      if (!conversation) {
+        res.write(`data: ${JSON.stringify({ type: 'error', message: 'Conversation not found' })}\n\n`);
+        res.end();
+        return;
+      }
 
-    // Simulate the 3-stage process
-    sendEvent('stage1_start');
-    setTimeout(() => {
-      sendEvent('stage1_complete', {
-        data: {
+      // Check if this is the first message to generate a title
+      const isFirstMessage = conversation.messages.length === 0;
+
+      // Add user message
+      conversation.messages.push({
+        role: 'user',
+        content: content
+      });
+
+      // Save conversation with user message
+      await kv.set(`conversation:${conversationId}`, conversation);
+
+      // Send mock streaming events
+      const sendEvent = (type, data) => {
+        res.write(`data: ${JSON.stringify({ type, ...data })}\n\n`);
+      };
+
+      // Simulate the 3-stage process
+      sendEvent('stage1_start');
+      setTimeout(() => {
+        const stage1Data = {
           responses: [
             { model: 'openai/gpt-5.1', response: 'Mock response 1' },
             { model: 'google/gemini-3-pro-preview', response: 'Mock response 2' },
             { model: 'anthropic/claude-sonnet-4.5', response: 'Mock response 3' },
             { model: 'x-ai/grok-4', response: 'Mock response 4' }
           ]
-        }
-      });
+        };
 
-      sendEvent('stage2_start');
-      setTimeout(() => {
-        sendEvent('stage2_complete', {
-          data: {
+        sendEvent('stage1_complete', { data: stage1Data });
+
+        sendEvent('stage2_start');
+        setTimeout(() => {
+          const stage2Data = {
             rankings: [
               {
                 model: 'openai/gpt-5.1',
@@ -52,8 +73,9 @@ export default function handler(req, res) {
                 parsed_ranking: ['Response A', 'Response B', 'Response C', 'Response D']
               }
             ]
-          },
-          metadata: {
+          };
+
+          const metadata = {
             label_to_model: {
               'Response A': 'openai/gpt-5.1',
               'Response B': 'google/gemini-3-pro-preview',
@@ -61,26 +83,48 @@ export default function handler(req, res) {
               'Response D': 'x-ai/grok-4'
             },
             aggregate_rankings: { 'Response A': 1, 'Response B': 2, 'Response C': 3, 'Response D': 4 }
-          }
-        });
+          };
 
-        sendEvent('stage3_start');
-        setTimeout(() => {
-          sendEvent('stage3_complete', {
-            data: {
+          sendEvent('stage2_complete', { data: stage2Data, metadata });
+
+          sendEvent('stage3_start');
+          setTimeout(async () => {
+            const stage3Data = {
               model: 'google/gemini-3-pro-preview',
               response: 'This is a mock streaming response from the LLM Council Chairman.'
-            }
-          });
+            };
 
-          sendEvent('complete');
-          res.end();
+            sendEvent('stage3_complete', { data: stage3Data });
+
+            // Update title if this was the first message
+            if (isFirstMessage) {
+              conversation.title = `Discussion: ${content.slice(0, 50)}${content.length > 50 ? '...' : ''}`;
+              sendEvent('title_complete', { data: { title: conversation.title } });
+            }
+
+            // Save complete assistant message to conversation
+            conversation.messages.push({
+              role: 'assistant',
+              stage1: stage1Data,
+              stage2: stage2Data,
+              stage3: stage3Data
+            });
+
+            await kv.set(`conversation:${conversationId}`, conversation);
+
+            sendEvent('complete');
+            res.end();
+          }, 500);
         }, 500);
       }, 500);
-    }, 500);
 
-    return;
+      return;
+    }
+
+    res.status(405).json({ error: 'Method not allowed' });
+  } catch (error) {
+    console.error('KV operation failed:', error);
+    res.write(`data: ${JSON.stringify({ type: 'error', message: 'Database operation failed' })}\n\n`);
+    res.end();
   }
-
-  res.status(405).json({ error: 'Method not allowed' });
 }

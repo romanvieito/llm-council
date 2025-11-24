@@ -1,9 +1,8 @@
-// In-memory store for Vercel serverless functions
-// Note: this won't persist across serverless invocations
-// TODO: Replace with Vercel KV or Postgres for persistence
-const conversations = {};
+import { kv } from '@vercel/kv';
 
-export default function handler(req, res) {
+const CONVERSATIONS_LIST_KEY = 'conversations:list';
+
+export default async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -15,37 +14,54 @@ export default function handler(req, res) {
     return;
   }
 
-  if (req.method === 'GET') {
-    // Return list of conversations as metadata
-    const list = Object.values(conversations).map(conv => ({
-      id: conv.id,
-      created_at: conv.created_at,
-      title: conv.title,
-      message_count: conv.messages ? conv.messages.length : 0
-    }));
+  try {
+    if (req.method === 'GET') {
+      // Get list of conversation IDs
+      const conversationIds = await kv.smembers(CONVERSATIONS_LIST_KEY) || [];
 
-    // Sort by creation time, newest first
-    list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      // Get all conversations
+      const conversations = [];
+      for (const id of conversationIds) {
+        const conversation = await kv.get(`conversation:${id}`);
+        if (conversation) {
+          conversations.push({
+            id: conversation.id,
+            created_at: conversation.created_at,
+            title: conversation.title || 'New Conversation',
+            message_count: conversation.messages ? conversation.messages.length : 0
+          });
+        }
+      }
 
-    res.status(200).json(list);
-    return;
+      // Sort by creation time, newest first
+      conversations.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+      res.status(200).json(conversations);
+      return;
+    }
+
+    if (req.method === 'POST') {
+      const conversationId = crypto.randomUUID();
+      const conversation = {
+        id: conversationId,
+        created_at: new Date().toISOString(),
+        title: 'New Conversation',
+        messages: []
+      };
+
+      // Store conversation in KV
+      await kv.set(`conversation:${conversationId}`, conversation);
+
+      // Add to conversations list
+      await kv.sadd(CONVERSATIONS_LIST_KEY, conversationId);
+
+      res.status(200).json(conversation);
+      return;
+    }
+
+    res.status(405).json({ error: 'Method not allowed' });
+  } catch (error) {
+    console.error('KV operation failed:', error);
+    res.status(500).json({ error: 'Database operation failed' });
   }
-
-  if (req.method === 'POST') {
-    const conversationId = crypto.randomUUID();
-    const conversation = {
-      id: conversationId,
-      created_at: new Date().toISOString(),
-      title: 'New Conversation',
-      messages: []
-    };
-
-    // Store in memory (note: won't persist in serverless)
-    conversations[conversationId] = conversation;
-
-    res.status(200).json(conversation);
-    return;
-  }
-
-  res.status(405).json({ error: 'Method not allowed' });
 }
