@@ -1,3 +1,7 @@
+// Simple in-memory store (note: this won't persist across serverless invocations)
+// In production, use a database
+const conversations = {};
+
 export default function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -11,18 +15,30 @@ export default function handler(req, res) {
   }
 
   if (req.method === 'GET') {
-    res.status(200).json([]);
+    // Return list of conversations as metadata
+    const list = Object.values(conversations).map(conv => ({
+      id: conv.id,
+      created_at: conv.created_at,
+      title: conv.title,
+      message_count: conv.messages ? conv.messages.length : 0
+    }));
+    res.status(200).json(list);
     return;
   }
 
   if (req.method === 'POST') {
     const conversationId = crypto.randomUUID();
-    res.status(200).json({
+    const conversation = {
       id: conversationId,
       created_at: new Date().toISOString(),
       title: 'New Conversation',
       messages: []
-    });
+    };
+    
+    // Store in memory (note: won't persist in serverless)
+    conversations[conversationId] = conversation;
+    
+    res.status(200).json(conversation);
     return;
   }
 
