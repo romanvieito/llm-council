@@ -32,40 +32,40 @@ function randomId() {
 export const DEFAULT_MODEL_CONFIG = {
   // Mirrors current repo defaults for a good OOTB experience.
   council_models: [
-    'bytedance-seed/seed-1.6-flash',
-    'nvidia/nemotron-3-nano-30b-a3b:free',
-    'xiaomi/mimo-v2-flash:free',
-    'mistralai/devstral-2512:free',
+    'x-ai/grok-4.1-fast',
+    'openai/gpt-5.2-chat',
+    'anthropic/claude-4.5-haiku',
+    'google/gemini-3-flash'
   ],
-  chairman_model: 'google/gemini-3-flash-preview',
+  chairman_model: 'google/gpt-5.2-chat',
   presets: {
     "Fast": {
       council_models: [
-        'google/gemini-flash-1.5',
-        'anthropic/claude-3-haiku',
-        'openai/gpt-4o-mini',
-        'bytedance-seed/seed-1.6-flash'
+        'x-ai/grok-4.1-fast',
+        'openai/gpt-5.2-chat',
+        'anthropic/claude-4.5-haiku',
+        'google/gemini-3-flash'
       ],
-      chairman_model: 'google/gemini-flash-1.5'
+      chairman_model: 'google/gpt-5.2-chat'
     },
     "Heavy": {
       council_models: [
-        'anthropic/claude-3-5-sonnet',
-        'openai/gpt-4o',
-        'google/gemini-pro-1.5',
-        'meta-llama/llama-3.3-70b-instruct'
+        'x-ai/grok-4',
+        'openai/gpt-5.2-pro',
+        'anthropic/claude-opus-4.5',
+        'google/gemini-3-pro-preview'
       ],
-      chairman_model: 'anthropic/claude-3-5-sonnet'
+      chairman_model: 'openai/gpt-5.2-pro'
     }
   },
   defaults: {
     council_models: [
-      'bytedance-seed/seed-1.6-flash',
-      'nvidia/nemotron-3-nano-30b-a3b:free',
-      'xiaomi/mimo-v2-flash:free',
-      'mistralai/devstral-2512:free',
+      'x-ai/grok-4.1-fast',
+      'openai/gpt-5.2-chat',
+      'anthropic/claude-4.5-haiku',
+      'google/gemini-3-flash'
     ],
-    chairman_model: 'google/gemini-3-flash-preview',
+    chairman_model: 'google/gpt-5.2-chat',
   },
 };
 
