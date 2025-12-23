@@ -38,7 +38,26 @@ export const DEFAULT_MODEL_CONFIG = {
     'mistralai/devstral-2512:free',
   ],
   chairman_model: 'google/gemini-3-flash-preview',
-  presets: {},
+  presets: {
+    "Fast": {
+      council_models: [
+        'google/gemini-flash-1.5',
+        'anthropic/claude-3-haiku',
+        'openai/gpt-4o-mini',
+        'bytedance-seed/seed-1.6-flash'
+      ],
+      chairman_model: 'google/gemini-flash-1.5'
+    },
+    "Heavy": {
+      council_models: [
+        'anthropic/claude-3-5-sonnet',
+        'openai/gpt-4o',
+        'google/gemini-pro-1.5',
+        'meta-llama/llama-3.3-70b-instruct'
+      ],
+      chairman_model: 'anthropic/claude-3-5-sonnet'
+    }
+  },
   defaults: {
     council_models: [
       'bytedance-seed/seed-1.6-flash',

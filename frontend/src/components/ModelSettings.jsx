@@ -9,7 +9,7 @@ import {
 } from '../localStore';
 import './ModelSettings.css';
 
-function ModelSettings({ onClose, initialTab = 'model-config' }) {
+function ModelSettings({ onClose }) {
   const [availableModels, setAvailableModels] = useState([]);
   const [, setCurrentConfig] = useState(null);
   const [systemDefaults, setSystemDefaults] = useState(null);
@@ -23,7 +23,7 @@ function ModelSettings({ onClose, initialTab = 'model-config' }) {
   const [error, setError] = useState(null);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState(initialTab);
+  const [activeTab, setActiveTab] = useState('model-config');
 
   // API Key state (local-only)
   const [openrouterApiKey, setOpenrouterApiKey] = useState('');
