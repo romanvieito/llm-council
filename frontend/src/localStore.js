@@ -34,7 +34,7 @@ export const DEFAULT_MODEL_CONFIG = {
   council_models: [
     'x-ai/grok-4.1-fast',
     'openai/gpt-5.2-chat',
-    'anthropic/claude-4.5-haiku',
+    'anthropic/claude-haiku-4.5',
     'google/gemini-3-flash'
   ],
   chairman_model: 'openai/gpt-5.2-chat',
@@ -43,7 +43,7 @@ export const DEFAULT_MODEL_CONFIG = {
       council_models: [
         'x-ai/grok-4.1-fast',
         'openai/gpt-5.2-chat',
-        'anthropic/claude-4.5-haiku',
+        'anthropic/claude-haiku-4.5',
         'google/gemini-3-flash'
       ],
       chairman_model: 'openai/gpt-5.2-chat'
@@ -62,7 +62,7 @@ export const DEFAULT_MODEL_CONFIG = {
     council_models: [
       'x-ai/grok-4.1-fast',
       'openai/gpt-5.2-chat',
-      'anthropic/claude-4.5-haiku',
+      'anthropic/claude-haiku-4.5',
       'google/gemini-3-flash'
     ],
     chairman_model: 'google/gpt-5.2-chat',
