@@ -22,8 +22,11 @@ function ModelSettings({ onClose, initialTab }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
-  // Tab state
-  const [activeTab, setActiveTab] = useState(initialTab || 'model-config');
+  // Available tabs - first tab is the default
+  const tabs = ['model-config', 'api-keys'];
+
+  // Tab state - default to first tab if no valid initialTab provided
+  const [activeTab, setActiveTab] = useState(initialTab && tabs.includes(initialTab) ? initialTab : tabs[0]);
 
   // API Key state (local-only)
   const [openrouterApiKey, setOpenrouterApiKey] = useState('');
