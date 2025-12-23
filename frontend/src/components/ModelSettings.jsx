@@ -23,7 +23,7 @@ function ModelSettings({ onClose }) {
   const [error, setError] = useState(null);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState('api-keys');
+  const [activeTab, setActiveTab] = useState('model-config');
 
   // API Key state (local-only)
   const [openrouterApiKey, setOpenrouterApiKey] = useState('');
@@ -244,16 +244,16 @@ function ModelSettings({ onClose }) {
 
         <div className="model-settings-tabs">
           <button
-            className={`tab-button ${activeTab === 'api-keys' ? 'active' : ''}`}
-            onClick={() => setActiveTab('api-keys')}
-          >
-            API Keys
-          </button>
-          <button
             className={`tab-button ${activeTab === 'model-config' ? 'active' : ''}`}
             onClick={() => setActiveTab('model-config')}
           >
             Model Configuration
+          </button>
+          <button
+            className={`tab-button ${activeTab === 'api-keys' ? 'active' : ''}`}
+            onClick={() => setActiveTab('api-keys')}
+          >
+            API Keys
           </button>
         </div>
 
