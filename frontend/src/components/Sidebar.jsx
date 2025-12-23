@@ -18,7 +18,7 @@ export default function Sidebar({
           </button>
         </div>
         <button className="new-conversation-btn" onClick={onNewConversation}>
-          + New Conversation
+          <span>+</span> New Conversation
         </button>
       </div>
 

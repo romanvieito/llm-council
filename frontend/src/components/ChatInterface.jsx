@@ -44,7 +44,7 @@ export default function ChatInterface({
       <div className="chat-interface">
         <div className="empty-state">
           <h2>Welcome to Ava LLM</h2>
-          <p>Create a new conversation to get started</p>
+          <p>A council of AI models working together to give you the best possible answers. Create a new conversation to get started.</p>
         </div>
       </div>
     );
@@ -56,7 +56,7 @@ export default function ChatInterface({
         {conversation.messages.length === 0 ? (
           <div className="empty-state">
             <h2>Start a conversation</h2>
-            <p>Ask a question to consult Ava</p>
+            <p>Ask any question and the LLM Council will deliberate to provide you with a comprehensive answer.</p>
           </div>
         ) : (
           conversation.messages.map((msg, index) => (
@@ -165,7 +165,7 @@ export default function ChatInterface({
           className="send-button"
           disabled={!hasApiKey || !input.trim() || isLoading}
         >
-          Send
+          {isLoading ? 'Sending...' : 'Send →'}
         </button>
       </form>
     </div>

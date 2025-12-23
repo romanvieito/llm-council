@@ -20,27 +20,15 @@ function App() {
   const [showModelSettings, setShowModelSettings] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(!!getOpenRouterKey());
 
-  const loadConversations = () => {
+
+  // Load conversations on mount
+  useEffect(() => {
     try {
       const convs = listLocalConversations();
       setConversations(convs);
     } catch (error) {
       console.error('Failed to load conversations:', error);
     }
-  };
-
-  const loadConversation = (id) => {
-    try {
-      const conv = getLocalConversation(id);
-      setCurrentConversation(conv);
-    } catch (error) {
-      console.error('Failed to load conversation:', error);
-    }
-  };
-
-  // Load conversations on mount
-  useEffect(() => {
-    loadConversations();
     setHasApiKey(!!getOpenRouterKey());
   }, []);
 
@@ -55,7 +43,12 @@ function App() {
   // Load conversation details when selected
   useEffect(() => {
     if (currentConversationId && (!currentConversation || currentConversation.id !== currentConversationId)) {
-      loadConversation(currentConversationId);
+      try {
+        const conv = getLocalConversation(currentConversationId);
+        setCurrentConversation(conv);
+      } catch (error) {
+        console.error('Failed to load conversation:', error);
+      }
     }
   }, [currentConversationId, currentConversation]);
 
@@ -196,7 +189,12 @@ function App() {
               }
               return next;
             });
-            loadConversations();
+            try {
+              const convs = listLocalConversations();
+              setConversations(convs);
+            } catch (error) {
+              console.error('Failed to load conversations:', error);
+            }
             break;
 
           case 'complete':
@@ -210,7 +208,12 @@ function App() {
               }
               return prev;
             });
-            loadConversations();
+            try {
+              const convs = listLocalConversations();
+              setConversations(convs);
+            } catch (error) {
+              console.error('Failed to load conversations:', error);
+            }
             setIsLoading(false);
             break;
 
