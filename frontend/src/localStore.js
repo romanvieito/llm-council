@@ -51,7 +51,7 @@ export const DEFAULT_MODEL_CONFIG = {
     "Heavy": {
       council_models: [
         'x-ai/grok-4',
-        'openai/gpt-5.2-pro',
+        'openai/gpt-5.2',
         'anthropic/claude-opus-4.5',
         'google/gemini-3-pro-preview'
       ],
