@@ -4,13 +4,15 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import uuid
 import json
 import asyncio
 
 from . import storage
 from .council import run_full_council, generate_conversation_title, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
+from .openrouter import query_models_parallel, query_model, fetch_available_models
+from .config import get_current_config, save_model_config
 
 app = FastAPI(title="LLM Council API")
 
@@ -54,10 +56,62 @@ class Conversation(BaseModel):
     messages: List[Dict[str, Any]]
 
 
+class ModelInfo(BaseModel):
+    """Information about an available model."""
+    id: str
+    name: str
+    description: str
+    pricing: Dict[str, Any]
+    context_length: Optional[int]
+    supported_parameters: List[str]
+    provider: str
+    created: Optional[int]
+
+
+class ModelConfig(BaseModel):
+    """Model configuration for council and chairman."""
+    council_models: List[str]
+    chairman_model: str
+    presets: Optional[Dict[str, Any]] = {}
+    defaults: Optional[Dict[str, Any]] = {}
+
+
+class UpdateModelConfigRequest(BaseModel):
+    """Request to update model configuration."""
+    council_models: List[str]
+    chairman_model: str
+    presets: Optional[Dict[str, Any]] = None
+
+
 @app.get("/")
 async def root():
     """Health check endpoint."""
     return {"status": "ok", "service": "LLM Council API"}
+
+
+@app.get("/api/models", response_model=List[ModelInfo])
+async def get_available_models():
+    """Get list of available models from OpenRouter."""
+    models = await fetch_available_models()
+    if models is None:
+        raise HTTPException(status_code=503, detail="Unable to fetch models from OpenRouter")
+    return models
+
+
+@app.get("/api/models/config", response_model=ModelConfig)
+async def get_model_config():
+    """Get current model configuration."""
+    config = get_current_config()
+    return ModelConfig(**config)
+
+
+@app.put("/api/models/config")
+async def update_model_config(request: UpdateModelConfigRequest):
+    """Update model configuration."""
+    success = save_model_config(request.council_models, request.chairman_model, request.presets)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to save model configuration")
+    return {"status": "success", "message": "Model configuration updated"}
 
 
 @app.get("/api/conversations", response_model=List[ConversationMetadata])

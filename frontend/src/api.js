@@ -2,7 +2,7 @@
  * API client for the LLM Council backend.
  */
 
-const API_BASE = '';
+const API_BASE = 'http://localhost:8001';
 
 export const api = {
   /**
@@ -111,5 +111,44 @@ export const api = {
         }
       }
     }
+  },
+
+  /**
+   * Get available models from OpenRouter.
+   */
+  async getAvailableModels() {
+    const response = await fetch(`${API_BASE}/api/models`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch available models');
+    }
+    return response.json();
+  },
+
+  /**
+   * Get current model configuration.
+   */
+  async getModelConfig() {
+    const response = await fetch(`${API_BASE}/api/models/config`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch model configuration');
+    }
+    return response.json();
+  },
+
+  /**
+   * Update model configuration.
+   */
+  async updateModelConfig(config) {
+    const response = await fetch(`${API_BASE}/api/models/config`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(config),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to update model configuration');
+    }
+    return response.json();
   },
 };

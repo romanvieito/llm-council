@@ -1,0 +1,385 @@
+import { useState, useEffect } from 'react';
+import { api } from '../api';
+import './ModelSettings.css';
+
+function ModelSettings({ onClose }) {
+  const [availableModels, setAvailableModels] = useState([]);
+  const [currentConfig, setCurrentConfig] = useState(null);
+  const [systemDefaults, setSystemDefaults] = useState(null);
+  const [selectedCouncilModels, setSelectedCouncilModels] = useState([]);
+  const [selectedChairmanModel, setSelectedChairmanModel] = useState('');
+  const [presets, setPresets] = useState({});
+  const [newPresetName, setNewPresetName] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Load config first to show current selection while models load
+      const config = await api.getModelConfig();
+      setCurrentConfig(config);
+      setSystemDefaults(config.defaults || null);
+      setSelectedCouncilModels(config.council_models);
+      setSelectedChairmanModel(config.chairman_model);
+      setPresets(config.presets || {});
+
+      // Then load available models
+      const models = await api.getAvailableModels();
+      setAvailableModels(models);
+    } catch (err) {
+      console.error('Failed to load data:', err);
+      setError(`Failed to load data: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCouncilModelToggle = (modelId) => {
+    setSelectedCouncilModels(prev => {
+      if (prev.includes(modelId)) {
+        return prev.filter(id => id !== modelId);
+      } else {
+        return [...prev, modelId];
+      }
+    });
+  };
+
+  const handleChairmanModelChange = (modelId) => {
+    setSelectedChairmanModel(modelId);
+  };
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      setError(null);
+
+      await api.updateModelConfig({
+        council_models: selectedCouncilModels,
+        chairman_model: selectedChairmanModel,
+        presets: presets
+      });
+
+      setCurrentConfig({
+        council_models: selectedCouncilModels,
+        chairman_model: selectedChairmanModel,
+        presets: presets
+      });
+
+      // Show success message briefly
+      setError('Configuration saved successfully!');
+      setTimeout(() => setError(null), 3000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSavePreset = async () => {
+    if (!newPresetName.trim()) return;
+    
+    const updatedPresets = {
+      ...presets,
+      [newPresetName.trim()]: {
+        council_models: selectedCouncilModels,
+        chairman_model: selectedChairmanModel
+      }
+    };
+
+    try {
+      setSaving(true);
+      await api.updateModelConfig({
+        council_models: selectedCouncilModels,
+        chairman_model: selectedChairmanModel,
+        presets: updatedPresets
+      });
+      
+      setPresets(updatedPresets);
+      setNewPresetName('');
+      setError(`Preset "${newPresetName}" saved!`);
+      setTimeout(() => setError(null), 3000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const applyPreset = (name) => {
+    const preset = presets[name];
+    if (preset) {
+      setSelectedCouncilModels(preset.council_models);
+      setSelectedChairmanModel(preset.chairman_model);
+    }
+  };
+
+  const deletePreset = async (name) => {
+    const { [name]: deleted, ...remainingPresets } = presets;
+    
+    try {
+      setSaving(true);
+      await api.updateModelConfig({
+        council_models: selectedCouncilModels,
+        chairman_model: selectedChairmanModel,
+        presets: remainingPresets
+      });
+      setPresets(remainingPresets);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleReset = () => {
+    if (systemDefaults) {
+      setSelectedCouncilModels(systemDefaults.council_models);
+      setSelectedChairmanModel(systemDefaults.chairman_model);
+      setError('Restored system default models.');
+      setTimeout(() => setError(null), 3000);
+    }
+  };
+
+  const filteredModels = availableModels.filter(model =>
+    model.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    model.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    model.provider.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <div className="model-settings-overlay">
+      <div className="model-modal">
+        <div className="model-settings-header">
+          <h2>Model Settings</h2>
+          <button className="close-button" onClick={onClose} aria-label="Close">×</button>
+        </div>
+
+        {error && (
+          <div className={`message ${error.includes('successfully') ? 'success' : 'error'}`}>
+            {error}
+          </div>
+        )}
+
+        <div className="model-settings-content">
+          <div className="presets-section">
+            <div className="section-header">
+              <h3>Configuration Presets</h3>
+              <div className="save-preset-input">
+                <input 
+                  type="text" 
+                  placeholder="New preset name..." 
+                  value={newPresetName}
+                  onChange={(e) => setNewPresetName(e.target.value)}
+                />
+                <button 
+                  onClick={handleSavePreset}
+                  disabled={!newPresetName.trim() || saving}
+                  className="save-preset-btn"
+                >
+                  Save Current
+                </button>
+              </div>
+            </div>
+            <div className="presets-list">
+              {Object.keys(presets).length > 0 ? (
+                Object.keys(presets).map(name => (
+                  <div key={name} className="preset-item">
+                    <button 
+                      className="preset-apply-btn"
+                      onClick={() => applyPreset(name)}
+                      title={`Apply ${name} preset`}
+                    >
+                      {name}
+                    </button>
+                    <button 
+                      className="preset-delete-btn"
+                      onClick={() => deletePreset(name)}
+                      title="Delete preset"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div className="no-presets">No presets saved yet. Save your current config as "Fast", "Cheap", etc.</div>
+              )}
+            </div>
+          </div>
+
+          <div className="search-section">
+            <input
+              type="text"
+              placeholder="Search models by name, ID, or provider..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="search-input"
+            />
+          </div>
+
+          <div className="current-config">
+            <h3>Current Configuration</h3>
+            <div className="config-summary">
+              <div className="config-item">
+                <strong>Council Models ({selectedCouncilModels.length})</strong>
+                <div className="model-list">
+                  {selectedCouncilModels.length > 0 ? (
+                    selectedCouncilModels.map(modelId => {
+                      const model = availableModels.find(m => m.id === modelId);
+                      return (
+                        <span key={modelId} className="model-tag">
+                          {model ? model.name : modelId}
+                        </span>
+                      );
+                    })
+                  ) : (
+                    <span className="no-models-text">No models selected</span>
+                  )}
+                </div>
+              </div>
+              <div className="config-item">
+                <strong>Chairman Model</strong>
+                {selectedChairmanModel ? (
+                  <span className="model-tag chairman">
+                    {availableModels.find(m => m.id === selectedChairmanModel)?.name || selectedChairmanModel}
+                  </span>
+                ) : (
+                  <span className="no-models-text">No chairman selected</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="models-grid">
+            {loading && availableModels.length === 0 ? (
+              <div className="loading-models">
+                <div className="loading-spinner"></div>
+                <p>Loading available models...</p>
+              </div>
+            ) : filteredModels.length === 0 ? (
+              <div className="no-models">
+                {searchTerm ? `No models found matching "${searchTerm}"` : 'No models available'}
+              </div>
+            ) : (
+              filteredModels.map(model => {
+                const isSelected = selectedCouncilModels.includes(model.id);
+                const isChairman = selectedChairmanModel === model.id;
+                
+                return (
+                  <div 
+                    key={model.id} 
+                    className={`model-card ${isSelected ? 'selected' : ''} ${isChairman ? 'is-chairman' : ''}`}
+                  >
+                    <div className="model-header">
+                      <div className="model-info">
+                        <div className="model-title-row">
+                          <h4>{model.name}</h4>
+                          <div className="status-badges">
+                            {isSelected && <span className="status-badge council" title="Council Member">👥</span>}
+                            {isChairman && <span className="status-badge chairman" title="Council Chairman">👑</span>}
+                          </div>
+                        </div>
+                        <div className="model-meta">
+                          <small className="model-id">{model.id}</small>
+                          {model.provider && (
+                            <>
+                              <span className="meta-separator">•</span>
+                              <small className="model-provider">{model.provider}</small>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <div className="model-controls">
+                        <label className={`control-btn ${isSelected ? 'active' : ''}`} title="Add to Council">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleCouncilModelToggle(model.id)}
+                          />
+                          Council
+                        </label>
+                        <label className={`control-btn ${isChairman ? 'active chairman' : ''}`} title="Set as Chairman">
+                          <input
+                            type="radio"
+                            name="chairman"
+                            checked={isChairman}
+                            onChange={() => handleChairmanModelChange(model.id)}
+                          />
+                          Chairman
+                        </label>
+                      </div>
+                    </div>
+
+                    {model.description && (
+                      <p className="model-description">{model.description}</p>
+                    )}
+
+                    <div className="model-details">
+                      {model.context_length && (
+                        <div className="detail">
+                          <span className="detail-label">Context:</span>
+                          <span className="detail-value">{model.context_length.toLocaleString()}</span>
+                        </div>
+                      )}
+                      <div className="pricing-details">
+                        {model.pricing && model.pricing.prompt && (
+                          <div className="detail">
+                            <span className="detail-label">In:</span>
+                            <span className="detail-value">${(parseFloat(model.pricing.prompt) * 1000000).toFixed(2)}/M</span>
+                          </div>
+                        )}
+                        {model.pricing && model.pricing.completion && (
+                          <div className="detail">
+                            <span className="detail-label">Out:</span>
+                            <span className="detail-value">${(parseFloat(model.pricing.completion) * 1000000).toFixed(2)}/M</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        <div className="model-settings-footer">
+          <button
+            className="reset-button"
+            onClick={handleReset}
+            disabled={saving}
+            title="Restore hardcoded system default models"
+          >
+            Restore Defaults
+          </button>
+          <div className="action-buttons">
+            <button
+              className="cancel-button"
+              onClick={onClose}
+              disabled={saving}
+            >
+              Cancel
+            </button>
+            <button
+              className="save-button"
+              onClick={handleSave}
+              disabled={saving || selectedCouncilModels.length === 0 || !selectedChairmanModel}
+            >
+              {saving ? 'Saving...' : 'Save Configuration'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default ModelSettings;

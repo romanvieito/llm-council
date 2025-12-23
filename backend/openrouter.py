@@ -5,6 +5,55 @@ from typing import List, Dict, Any, Optional
 from .config import OPENROUTER_API_KEY, OPENROUTER_API_URL
 
 
+async def fetch_available_models() -> Optional[List[Dict[str, Any]]]:
+    """
+    Fetch available models from OpenRouter API.
+
+    Returns:
+        List of available models with metadata, or None if failed
+    """
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(
+                "https://openrouter.ai/api/v1/models",
+                headers=headers
+            )
+            response.raise_for_status()
+
+            data = response.json()
+
+            # Extract model information
+            models = []
+            for model in data.get("data", []):
+                model_id = model.get("id", "")
+                # Extract provider from model ID (e.g., "openai/gpt-4" -> "openai")
+                provider = model.get("owned_by", "")
+                if not provider and "/" in model_id:
+                    provider = model_id.split("/")[0]
+
+                models.append({
+                    "id": model_id,
+                    "name": model.get("name", model_id),
+                    "description": model.get("description", ""),
+                    "pricing": model.get("pricing", {}),
+                    "context_length": model.get("context_length"),
+                    "supported_parameters": model.get("supported_parameters", []),
+                    "provider": provider,
+                    "created": model.get("created"),
+                })
+
+            return models
+
+    except Exception as e:
+        print(f"Error fetching available models: {e}")
+        return None
+
+
 async def query_model(
     model: str,
     messages: List[Dict[str, str]],

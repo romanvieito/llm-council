@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
+import ModelSettings from './components/ModelSettings';
 import { api } from './api';
 import './App.css';
 
@@ -9,18 +10,7 @@ function App() {
   const [currentConversationId, setCurrentConversationId] = useState(null);
   const [currentConversation, setCurrentConversation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  // Load conversations on mount
-  useEffect(() => {
-    loadConversations();
-  }, []);
-
-  // Load conversation details when selected
-  useEffect(() => {
-    if (currentConversationId && (!currentConversation || currentConversation.id !== currentConversationId)) {
-      loadConversation(currentConversationId);
-    }
-  }, [currentConversationId, currentConversation]);
+  const [showModelSettings, setShowModelSettings] = useState(false);
 
   const loadConversations = async () => {
     try {
@@ -40,6 +30,18 @@ function App() {
     }
   };
 
+  // Load conversations on mount
+  useEffect(() => {
+    loadConversations();
+  }, []);
+
+  // Load conversation details when selected
+  useEffect(() => {
+    if (currentConversationId && (!currentConversation || currentConversation.id !== currentConversationId)) {
+      loadConversation(currentConversationId);
+    }
+  }, [currentConversationId, currentConversation]);
+
   const handleNewConversation = async () => {
     try {
       const newConv = await api.createConversation();
@@ -56,6 +58,14 @@ function App() {
 
   const handleSelectConversation = (id) => {
     setCurrentConversationId(id);
+  };
+
+  const handleOpenModelSettings = () => {
+    setShowModelSettings(true);
+  };
+
+  const handleCloseModelSettings = () => {
+    setShowModelSettings(false);
   };
 
   const handleSendMessage = async (content) => {
@@ -189,12 +199,16 @@ function App() {
         currentConversationId={currentConversationId}
         onSelectConversation={handleSelectConversation}
         onNewConversation={handleNewConversation}
+        onOpenModelSettings={handleOpenModelSettings}
       />
       <ChatInterface
         conversation={currentConversation}
         onSendMessage={handleSendMessage}
         isLoading={isLoading}
       />
+      {showModelSettings && (
+        <ModelSettings onClose={handleCloseModelSettings} />
+      )}
     </div>
   );
 }

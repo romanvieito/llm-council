@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+// No React hooks needed for this component
 import './Sidebar.css';
 
 export default function Sidebar({
@@ -6,11 +6,17 @@ export default function Sidebar({
   currentConversationId,
   onSelectConversation,
   onNewConversation,
+  onOpenModelSettings,
 }) {
   return (
     <div className="sidebar">
       <div className="sidebar-header">
-        <h1>Ava LLM</h1>
+        <div className="header-top">
+          <h1>Ava LLM</h1>
+          <button className="settings-btn" onClick={onOpenModelSettings} title="Model Settings">
+            ⚙️
+          </button>
+        </div>
         <button className="new-conversation-btn" onClick={onNewConversation}>
           + New Conversation
         </button>
