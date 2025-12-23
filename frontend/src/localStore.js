@@ -35,7 +35,7 @@ export const DEFAULT_MODEL_CONFIG = {
     'x-ai/grok-4.1-fast',
     'openai/gpt-5.2-chat',
     'anthropic/claude-haiku-4.5',
-    'google/gemini-3-flash'
+    'google/gemini-3-flash-preview'
   ],
   chairman_model: 'openai/gpt-5.2-chat',
   presets: {
@@ -44,7 +44,7 @@ export const DEFAULT_MODEL_CONFIG = {
         'x-ai/grok-4.1-fast',
         'openai/gpt-5.2-chat',
         'anthropic/claude-haiku-4.5',
-        'google/gemini-3-flash'
+        'google/gemini-3-flash-preview'
       ],
       chairman_model: 'openai/gpt-5.2-chat'
     },
@@ -55,7 +55,7 @@ export const DEFAULT_MODEL_CONFIG = {
         'anthropic/claude-opus-4.5',
         'google/gemini-3-pro-preview'
       ],
-      chairman_model: 'anthropic/claude-opus-4.5'
+      chairman_model: 'openai/gpt-5.2-pro'
     }
   },
   defaults: {
@@ -63,7 +63,7 @@ export const DEFAULT_MODEL_CONFIG = {
       'x-ai/grok-4.1-fast',
       'openai/gpt-5.2-chat',
       'anthropic/claude-haiku-4.5',
-      'google/gemini-3-flash'
+      'google/gemini-3-flash-preview'
     ],
     chairman_model: 'google/gpt-5.2-chat',
   },

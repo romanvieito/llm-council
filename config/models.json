@@ -5,16 +5,16 @@
     "xiaomi/mimo-v2-flash:free",
     "mistralai/devstral-2512:free"
   ],
-  "chairman_model": "google/gemini-3-flash",
+  "chairman_model": "google/gemini-3-flash-preview",
   "presets": {
     "faster": {
       "council_models": [
         "x-ai/grok-3",
         "openai/gpt-5.2-chat",
         "anthropic/claude-haiku-4.5",
-        "google/gemini-3-flash"
+        "google/gemini-3-flash-preview"
       ],
-      "chairman_model": "google/gemini-3-flash"
+      "chairman_model": "google/gemini-3-flash-preview"
     },
     "cheap": {
       "council_models": [
@@ -23,7 +23,7 @@
         "xiaomi/mimo-v2-flash:free",
         "mistralai/devstral-2512:free"
       ],
-      "chairman_model": "google/gemini-3-flash"
+      "chairman_model": "google/gemini-3-flash-preview"
     }
   }
 }
