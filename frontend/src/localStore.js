@@ -37,7 +37,7 @@ export const DEFAULT_MODEL_CONFIG = {
     'anthropic/claude-4.5-haiku',
     'google/gemini-3-flash'
   ],
-  chairman_model: 'google/gpt-5.2-chat',
+  chairman_model: 'openai/gpt-5.2-chat',
   presets: {
     "Fast": {
       council_models: [
@@ -46,7 +46,7 @@ export const DEFAULT_MODEL_CONFIG = {
         'anthropic/claude-4.5-haiku',
         'google/gemini-3-flash'
       ],
-      chairman_model: 'google/gpt-5.2-chat'
+      chairman_model: 'openai/gpt-5.2-chat'
     },
     "Heavy": {
       council_models: [
@@ -55,7 +55,7 @@ export const DEFAULT_MODEL_CONFIG = {
         'anthropic/claude-opus-4.5',
         'google/gemini-3-pro-preview'
       ],
-      chairman_model: 'openai/gpt-5.2-pro'
+      chairman_model: 'anthropic/claude-opus-4.5'
     }
   },
   defaults: {
