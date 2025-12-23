@@ -1,5 +1,12 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
+import {
+  DEFAULT_MODEL_CONFIG,
+  getOpenRouterKey,
+  setOpenRouterKey,
+  getModelConfig,
+  setModelConfig,
+} from '../localStore';
 import './ModelSettings.css';
 
 function ModelSettings({ onClose }) {
@@ -15,8 +22,7 @@ function ModelSettings({ onClose }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
-  // API Key state
-  const [apiKeys, setApiKeys] = useState(null);
+  // API Key state (local-only)
   const [openrouterApiKey, setOpenrouterApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
   const [savingApiKey, setSavingApiKey] = useState(false);
@@ -30,24 +36,25 @@ function ModelSettings({ onClose }) {
       setLoading(true);
       setError(null);
 
-      // Load config first to show current selection while models load
-      const config = await api.getModelConfig();
+      // Load local config first to show current selection immediately
+      const config = getModelConfig();
       setCurrentConfig(config);
-      setSystemDefaults(config.defaults || null);
+      setSystemDefaults(DEFAULT_MODEL_CONFIG);
       setSelectedCouncilModels(config.council_models);
       setSelectedChairmanModel(config.chairman_model);
       setPresets(config.presets || {});
 
-      // Load API keys
-      const keys = await api.getAPIKeys();
-      setApiKeys(keys);
-      if (keys.openrouter_api_key) {
-        setOpenrouterApiKey(keys.openrouter_api_key);
-      }
+      // Load API key (local)
+      const key = getOpenRouterKey();
+      if (key) setOpenrouterApiKey(key);
 
-      // Then load available models
-      const models = await api.getAvailableModels();
-      setAvailableModels(models);
+      // Then load available models (requires key). If missing, skip.
+      if (key) {
+        const models = await api.getAvailableModels();
+        setAvailableModels(models);
+      } else {
+        setAvailableModels([]);
+      }
     } catch (err) {
       console.error('Failed to load data:', err);
       setError(`Failed to load data: ${err.message}`);
@@ -75,17 +82,14 @@ function ModelSettings({ onClose }) {
       setSaving(true);
       setError(null);
 
-      await api.updateModelConfig({
+      const nextConfig = {
         council_models: selectedCouncilModels,
         chairman_model: selectedChairmanModel,
         presets: presets
-      });
+      };
+      setModelConfig(nextConfig);
 
-      setCurrentConfig({
-        council_models: selectedCouncilModels,
-        chairman_model: selectedChairmanModel,
-        presets: presets
-      });
+      setCurrentConfig(nextConfig);
 
       // Show success message briefly
       setError('Configuration saved successfully!');
@@ -107,12 +111,13 @@ function ModelSettings({ onClose }) {
       setSavingApiKey(true);
       setError(null);
 
-      await api.updateAPIKey(openrouterApiKey.trim());
+      const key = openrouterApiKey.trim();
+      setOpenRouterKey(key);
+      setOpenrouterApiKey(key);
 
-      // Reload API keys to get the masked version
-      const keys = await api.getAPIKeys();
-      setApiKeys(keys);
-      setOpenrouterApiKey(keys.openrouter_api_key);
+      // Fetch models now that we have a key
+      const models = await api.getAvailableModels();
+      setAvailableModels(models);
 
       setError('API key saved successfully!');
       setTimeout(() => setError(null), 3000);
@@ -136,11 +141,12 @@ function ModelSettings({ onClose }) {
 
     try {
       setSaving(true);
-      await api.updateModelConfig({
+      const nextConfig = {
         council_models: selectedCouncilModels,
         chairman_model: selectedChairmanModel,
         presets: updatedPresets
-      });
+      };
+      setModelConfig(nextConfig);
       
       setPresets(updatedPresets);
       setNewPresetName('');
@@ -161,22 +167,19 @@ function ModelSettings({ onClose }) {
     setSelectedCouncilModels(preset.council_models);
     setSelectedChairmanModel(preset.chairman_model);
 
-    // Persist selection so the backend actually uses it for new messages
+    // Persist selection locally so new messages use it
     try {
       setSaving(true);
       setError(null);
 
-      await api.updateModelConfig({
+      const nextConfig = {
         council_models: preset.council_models,
         chairman_model: preset.chairman_model,
         presets: presets,
-      });
+      };
+      setModelConfig(nextConfig);
 
-      setCurrentConfig({
-        council_models: preset.council_models,
-        chairman_model: preset.chairman_model,
-        presets: presets,
-      });
+      setCurrentConfig(nextConfig);
 
       setError(`Preset "${name}" applied.`);
       setTimeout(() => setError(null), 3000);
@@ -192,11 +195,12 @@ function ModelSettings({ onClose }) {
     
     try {
       setSaving(true);
-      await api.updateModelConfig({
+      const nextConfig = {
         council_models: selectedCouncilModels,
         chairman_model: selectedChairmanModel,
         presets: remainingPresets
-      });
+      };
+      setModelConfig(nextConfig);
       setPresets(remainingPresets);
     } catch (err) {
       setError(err.message);
@@ -266,7 +270,7 @@ function ModelSettings({ onClose }) {
               </div>
               <small className="api-key-help">
                 Get your API key from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer">OpenRouter</a>.
-                Your key is stored locally and never sent anywhere except OpenRouter.
+                Your key is stored locally and is sent to this app's backend per request only to proxy calls to OpenRouter (it is not persisted server-side).
               </small>
             </div>
           </div>

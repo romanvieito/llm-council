@@ -2,91 +2,46 @@
  * API client for the LLM Council backend.
  */
 
-const API_BASE = 'http://localhost:8001';
+import { getOpenRouterKey, getModelConfig } from './localStore';
+
+// Prefer relative API base (works with Vite dev proxy and same-origin deployments).
+const API_BASE = import.meta?.env?.VITE_API_BASE || '';
 
 export const api = {
   /**
-   * List all conversations.
-   */
-  async listConversations() {
-    const response = await fetch(`${API_BASE}/api/conversations`);
-    if (!response.ok) {
-      throw new Error('Failed to list conversations');
-    }
-    return response.json();
-  },
-
-  /**
-   * Create a new conversation.
-   */
-  async createConversation() {
-    const response = await fetch(`${API_BASE}/api/conversations`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({}),
-    });
-    if (!response.ok) {
-      throw new Error('Failed to create conversation');
-    }
-    return response.json();
-  },
-
-  /**
-   * Get a specific conversation.
-   */
-  async getConversation(conversationId) {
-    const response = await fetch(
-      `${API_BASE}/api/conversations/${conversationId}`
-    );
-    if (!response.ok) {
-      throw new Error('Failed to get conversation');
-    }
-    return response.json();
-  },
-
-  /**
-   * Send a message in a conversation.
-   */
-  async sendMessage(conversationId, content) {
-    const response = await fetch(
-      `${API_BASE}/api/conversations/${conversationId}/message`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ content }),
-      }
-    );
-    if (!response.ok) {
-      throw new Error('Failed to send message');
-    }
-    return response.json();
-  },
-
-  /**
    * Send a message and receive streaming updates.
-   * @param {string} conversationId - The conversation ID
+   * @param {string} conversationId - Local conversation id (frontend-owned)
    * @param {string} content - The message content
    * @param {function} onEvent - Callback function for each event: (eventType, data) => void
+   * @param {object} options - { isFirstMessage?: boolean }
    * @returns {Promise<void>}
    */
-  async sendMessageStream(conversationId, content, onEvent) {
+  async sendMessageStream(conversationId, content, onEvent, options = {}) {
+    const apiKey = getOpenRouterKey();
+    if (!apiKey) {
+      throw new Error('Missing OpenRouter API key. Add it in Model Settings.');
+    }
+
+    const modelConfig = getModelConfig();
     const response = await fetch(
-      `${API_BASE}/api/conversations/${conversationId}/message/stream`,
+      `${API_BASE}/api/council/stream`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-OpenRouter-Api-Key': apiKey,
         },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({
+          content,
+          model_config: modelConfig,
+          is_first_message: !!options.isFirstMessage,
+        }),
       }
     );
 
     if (!response.ok) {
-      throw new Error('Failed to send message');
+      const text = await response.text().catch(() => '');
+      throw new Error(text || 'Failed to send message');
     }
 
     const reader = response.body.getReader();
@@ -117,65 +72,19 @@ export const api = {
    * Get available models from OpenRouter.
    */
   async getAvailableModels() {
-    const response = await fetch(`${API_BASE}/api/models`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch available models');
+    const apiKey = getOpenRouterKey();
+    if (!apiKey) {
+      throw new Error('Missing OpenRouter API key. Add it in Model Settings.');
     }
-    return response.json();
-  },
 
-  /**
-   * Get current model configuration.
-   */
-  async getModelConfig() {
-    const response = await fetch(`${API_BASE}/api/models/config`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch model configuration');
-    }
-    return response.json();
-  },
-
-  /**
-   * Update model configuration.
-   */
-  async updateModelConfig(config) {
-    const response = await fetch(`${API_BASE}/api/models/config`, {
-      method: 'PUT',
+    const response = await fetch(`${API_BASE}/api/models`, {
       headers: {
-        'Content-Type': 'application/json',
+        'X-OpenRouter-Api-Key': apiKey,
       },
-      body: JSON.stringify(config),
     });
     if (!response.ok) {
-      throw new Error('Failed to update model configuration');
-    }
-    return response.json();
-  },
-
-  /**
-   * Get API key configuration (masked).
-   */
-  async getAPIKeys() {
-    const response = await fetch(`${API_BASE}/api/apikeys`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch API keys');
-    }
-    return response.json();
-  },
-
-  /**
-   * Update API key configuration.
-   */
-  async updateAPIKey(openrouterApiKey) {
-    const response = await fetch(`${API_BASE}/api/apikeys`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ openrouter_api_key: openrouterApiKey }),
-    });
-    if (!response.ok) {
-      throw new Error('Failed to update API key');
+      const text = await response.text().catch(() => '');
+      throw new Error(text || 'Failed to fetch available models');
     }
     return response.json();
   },

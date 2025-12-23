@@ -2,18 +2,21 @@
 
 import httpx
 from typing import List, Dict, Any, Optional
-from .config import OPENROUTER_API_KEY, OPENROUTER_API_URL
+from .config import OPENROUTER_API_URL
 
 
-async def fetch_available_models() -> Optional[List[Dict[str, Any]]]:
+async def fetch_available_models(api_key: str) -> Optional[List[Dict[str, Any]]]:
     """
     Fetch available models from OpenRouter API.
 
     Returns:
         List of available models with metadata, or None if failed
     """
+    if not api_key:
+        return None
+
     headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
 
@@ -57,6 +60,7 @@ async def fetch_available_models() -> Optional[List[Dict[str, Any]]]:
 async def query_model(
     model: str,
     messages: List[Dict[str, str]],
+    api_key: str,
     timeout: float = 120.0
 ) -> Optional[Dict[str, Any]]:
     """
@@ -70,8 +74,11 @@ async def query_model(
     Returns:
         Response dict with 'content' and optional 'reasoning_details', or None if failed
     """
+    if not api_key:
+        return None
+
     headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
 
@@ -104,7 +111,8 @@ async def query_model(
 
 async def query_models_parallel(
     models: List[str],
-    messages: List[Dict[str, str]]
+    messages: List[Dict[str, str]],
+    api_key: str,
 ) -> Dict[str, Optional[Dict[str, Any]]]:
     """
     Query multiple models in parallel.
@@ -119,7 +127,7 @@ async def query_models_parallel(
     import asyncio
 
     # Create tasks for all models
-    tasks = [query_model(model, messages) for model in models]
+    tasks = [query_model(model, messages, api_key=api_key) for model in models]
 
     # Wait for all to complete
     responses = await asyncio.gather(*tasks)

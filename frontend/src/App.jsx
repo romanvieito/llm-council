@@ -3,6 +3,13 @@ import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
 import ModelSettings from './components/ModelSettings';
 import { api } from './api';
+import {
+  listConversations as listLocalConversations,
+  getConversation as getLocalConversation,
+  createConversation as createLocalConversation,
+  saveConversation as saveLocalConversation,
+  getOpenRouterKey,
+} from './localStore';
 import './App.css';
 
 function App() {
@@ -11,19 +18,20 @@ function App() {
   const [currentConversation, setCurrentConversation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showModelSettings, setShowModelSettings] = useState(false);
+  const [hasApiKey, setHasApiKey] = useState(!!getOpenRouterKey());
 
-  const loadConversations = async () => {
+  const loadConversations = () => {
     try {
-      const convs = await api.listConversations();
+      const convs = listLocalConversations();
       setConversations(convs);
     } catch (error) {
       console.error('Failed to load conversations:', error);
     }
   };
 
-  const loadConversation = async (id) => {
+  const loadConversation = (id) => {
     try {
-      const conv = await api.getConversation(id);
+      const conv = getLocalConversation(id);
       setCurrentConversation(conv);
     } catch (error) {
       console.error('Failed to load conversation:', error);
@@ -33,6 +41,15 @@ function App() {
   // Load conversations on mount
   useEffect(() => {
     loadConversations();
+    setHasApiKey(!!getOpenRouterKey());
+  }, []);
+
+  // Keep api key state in sync if Model Settings changes it.
+  // (Also updates when localStorage changes in another tab.)
+  useEffect(() => {
+    const onStorage = () => setHasApiKey(!!getOpenRouterKey());
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, []);
 
   // Load conversation details when selected
@@ -44,7 +61,7 @@ function App() {
 
   const handleNewConversation = async () => {
     try {
-      const newConv = await api.createConversation();
+      const newConv = createLocalConversation();
       setConversations([
         { id: newConv.id, created_at: newConv.created_at, message_count: 0 },
         ...conversations,
@@ -66,6 +83,8 @@ function App() {
 
   const handleCloseModelSettings = () => {
     setShowModelSettings(false);
+    // Refresh api key state after closing settings (same-tab localStorage write).
+    setHasApiKey(!!getOpenRouterKey());
   };
 
   const handleSendMessage = async (content) => {
@@ -73,6 +92,8 @@ function App() {
 
     setIsLoading(true);
     try {
+      const isFirstMessage = (currentConversation?.messages?.length || 0) === 0;
+
       // Optimistically add user message to UI
       const userMessage = { role: 'user', content };
       setCurrentConversation((prev) => ({
@@ -101,7 +122,10 @@ function App() {
       }));
 
       // Send message with streaming
-      await api.sendMessageStream(currentConversationId, content, (eventType, event) => {
+      await api.sendMessageStream(
+        currentConversationId,
+        content,
+        (eventType, event) => {
         switch (eventType) {
           case 'stage1_start':
             setCurrentConversation((prev) => {
@@ -162,12 +186,30 @@ function App() {
             break;
 
           case 'title_complete':
-            // Reload conversations to get updated title
+            setCurrentConversation((prev) => {
+              if (!prev) return prev;
+              const next = { ...prev, title: event.data?.title || prev.title };
+              try {
+                saveLocalConversation(next);
+              } catch (e) {
+                console.error('Failed to persist conversation title:', e);
+              }
+              return next;
+            });
             loadConversations();
             break;
 
           case 'complete':
-            // Stream complete, reload conversations list
+            // Stream complete, persist conversation locally and refresh sidebar metadata
+            setCurrentConversation((prev) => {
+              if (!prev) return prev;
+              try {
+                saveLocalConversation(prev);
+              } catch (e) {
+                console.error('Failed to persist conversation:', e);
+              }
+              return prev;
+            });
             loadConversations();
             setIsLoading(false);
             break;
@@ -180,9 +222,14 @@ function App() {
           default:
             console.log('Unknown event type:', eventType);
         }
-      });
+      },
+      { isFirstMessage }
+      );
     } catch (error) {
       console.error('Failed to send message:', error);
+      if (String(error?.message || error).includes('Missing OpenRouter API key')) {
+        setShowModelSettings(true);
+      }
       // Remove optimistic messages on error
       setCurrentConversation((prev) => ({
         ...prev,
@@ -191,6 +238,16 @@ function App() {
       setIsLoading(false);
     }
   };
+
+  // Persist local conversation when it changes (best-effort).
+  useEffect(() => {
+    try {
+      if (currentConversation?.id) saveLocalConversation(currentConversation);
+    } catch (e) {
+      // Avoid throwing in render; just log.
+      console.error('Failed to persist conversation:', e);
+    }
+  }, [currentConversation]);
 
   return (
     <div className="app">
@@ -205,6 +262,8 @@ function App() {
         conversation={currentConversation}
         onSendMessage={handleSendMessage}
         isLoading={isLoading}
+        hasApiKey={hasApiKey}
+        onOpenModelSettings={handleOpenModelSettings}
       />
       {showModelSettings && (
         <ModelSettings onClose={handleCloseModelSettings} />

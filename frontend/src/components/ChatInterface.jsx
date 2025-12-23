@@ -9,6 +9,8 @@ export default function ChatInterface({
   conversation,
   onSendMessage,
   isLoading,
+  hasApiKey,
+  onOpenModelSettings,
 }) {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
@@ -120,26 +122,52 @@ export default function ChatInterface({
         <div ref={messagesEndRef} />
       </div>
 
-      {conversation.messages.length === 0 && (
-        <form className="input-form" onSubmit={handleSubmit}>
-          <textarea
-            className="message-input"
-            placeholder="Ask your question... (Shift+Enter for new line, Enter to send)"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={isLoading}
-            rows={3}
-          />
-          <button
-            type="submit"
-            className="send-button"
-            disabled={!input.trim() || isLoading}
-          >
-            Send
-          </button>
-        </form>
+      {!hasApiKey && (
+        <div className="empty-state" style={{ margin: '12px 16px' }}>
+          <p style={{ margin: 0 }}>
+            Missing OpenRouter API key. Add one in{' '}
+            <button
+              type="button"
+              onClick={onOpenModelSettings}
+              disabled={isLoading}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                color: '#3182ce',
+                cursor: 'pointer',
+                fontWeight: 600,
+              }}
+            >
+              Model Settings
+            </button>
+            .
+          </p>
+        </div>
       )}
+
+      <form className="input-form" onSubmit={handleSubmit}>
+        <textarea
+          className="message-input"
+          placeholder={
+            hasApiKey
+              ? 'Ask your question... (Shift+Enter for new line, Enter to send)'
+              : 'Add your OpenRouter API key in Model Settings to start chatting.'
+          }
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={isLoading || !hasApiKey}
+          rows={3}
+        />
+        <button
+          type="submit"
+          className="send-button"
+          disabled={!hasApiKey || !input.trim() || isLoading}
+        >
+          Send
+        </button>
+      </form>
     </div>
   );
 }

@@ -1,29 +1,42 @@
 """FastAPI backend for LLM Council."""
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 import uuid
 import json
 import asyncio
+import os
 
-from . import storage
-from .council import run_full_council, generate_conversation_title, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
-from .openrouter import query_models_parallel, query_model, fetch_available_models
-from .config import get_current_config, save_model_config, get_api_keys as get_api_keys_config, set_openrouter_api_key
+from .council import (
+    generate_conversation_title,
+    stage1_collect_responses,
+    stage2_collect_rankings,
+    stage3_synthesize_final,
+    calculate_aggregate_rankings,
+)
+from .openrouter import fetch_available_models
 
 app = FastAPI(title="LLM Council API")
 
-# Enable CORS for development and production
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
+# Enable CORS (tighten in public deployments)
+#
+# For production, set ALLOWED_ORIGINS to a comma-separated list, e.g.:
+# ALLOWED_ORIGINS=https://your-app.example,https://your-app.vercel.app
+_allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "").strip()
+_allowed_origins = (
+    [o.strip() for o in _allowed_origins_env.split(",") if o.strip()]
+    if _allowed_origins_env
+    else [
         "http://localhost:5173",  # Local development
         "http://localhost:3000",  # Alternative local port
-        "*",  # Allow all origins for production (Vercel will handle this)
-    ],
+    ]
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -39,22 +52,22 @@ class SendMessageRequest(BaseModel):
     """Request to send a message in a conversation."""
     content: str
 
+class ModelConfigPayload(BaseModel):
+    council_models: List[str]
+    chairman_model: str
+    presets: Optional[Dict[str, Any]] = None
 
-class ConversationMetadata(BaseModel):
-    """Conversation metadata for list view."""
-    id: str
-    created_at: str
-    title: str
-    message_count: int
+class CouncilStreamRequest(BaseModel):
+    """Request to run the council process (stateless)."""
+    content: str
+    # Pydantic v2 reserves `model_config`; keep wire format as `model_config` via alias.
+    model_cfg: ModelConfigPayload = Field(alias="model_config")
+    # Optional future extension; not used by current orchestration prompts
+    conversation_context: Optional[List[Dict[str, Any]]] = None
 
-
-class Conversation(BaseModel):
-    """Full conversation with all messages."""
-    id: str
-    created_at: str
-    title: str
-    messages: List[Dict[str, Any]]
-
+    model_config = {
+        "populate_by_name": True,
+    }
 
 class ModelInfo(BaseModel):
     """Information about an available model."""
@@ -68,29 +81,29 @@ class ModelInfo(BaseModel):
     created: Optional[int]
 
 
-class ModelConfig(BaseModel):
-    """Model configuration for council and chairman."""
-    council_models: List[str]
-    chairman_model: str
-    presets: Optional[Dict[str, Any]] = {}
-    defaults: Optional[Dict[str, Any]] = {}
+def _require_openrouter_key(x_openrouter_api_key: Optional[str]) -> str:
+    if not x_openrouter_api_key:
+        raise HTTPException(status_code=400, detail="Missing X-OpenRouter-Api-Key header")
+    return x_openrouter_api_key
 
 
-class UpdateModelConfigRequest(BaseModel):
-    """Request to update model configuration."""
-    council_models: List[str]
-    chairman_model: str
-    presets: Optional[Dict[str, Any]] = None
+# Very small in-memory throttling to reduce abuse on a public proxy.
+_RATE_WINDOW_SEC = 30
+_RATE_MAX_REQS = 30
+_rate_state: Dict[str, List[float]] = {}
 
 
-class APIKeyConfig(BaseModel):
-    """API key configuration."""
-    openrouter_api_key: Optional[str] = None
+def _check_rate_limit(client_ip: str):
+    import time
 
-
-class UpdateAPIKeyRequest(BaseModel):
-    """Request to update API key."""
-    openrouter_api_key: str
+    now = time.time()
+    window_start = now - _RATE_WINDOW_SEC
+    bucket = _rate_state.get(client_ip, [])
+    bucket = [t for t in bucket if t >= window_start]
+    if len(bucket) >= _RATE_MAX_REQS:
+        raise HTTPException(status_code=429, detail="Rate limit exceeded")
+    bucket.append(now)
+    _rate_state[client_ip] = bucket
 
 
 @app.get("/")
@@ -100,175 +113,80 @@ async def root():
 
 
 @app.get("/api/models", response_model=List[ModelInfo])
-async def get_available_models():
-    """Get list of available models from OpenRouter."""
-    models = await fetch_available_models()
+async def get_available_models(
+    request: Request,
+    x_openrouter_api_key: Optional[str] = Header(default=None),
+):
+    """Get list of available models from OpenRouter (stateless, user-keyed)."""
+    _check_rate_limit(request.client.host if request.client else "unknown")
+    api_key = _require_openrouter_key(x_openrouter_api_key)
+    models = await fetch_available_models(api_key=api_key)
     if models is None:
         raise HTTPException(status_code=503, detail="Unable to fetch models from OpenRouter")
     return models
 
 
-@app.get("/api/models/config", response_model=ModelConfig)
-async def get_model_config():
-    """Get current model configuration."""
-    config = get_current_config()
-    return ModelConfig(**config)
-
-
-@app.put("/api/models/config")
-async def update_model_config(request: UpdateModelConfigRequest):
-    """Update model configuration."""
-    success = save_model_config(request.council_models, request.chairman_model, request.presets)
-    if not success:
-        raise HTTPException(status_code=500, detail="Failed to save model configuration")
-    return {"status": "success", "message": "Model configuration updated"}
-
-
-@app.get("/api/apikeys", response_model=APIKeyConfig)
-async def get_api_keys():
-    """Get API key configuration (masked for security)."""
-    config = get_api_keys_config()
-    # Return masked version of API key for security
-    masked_api_key = None
-    if config.get('openrouter_api_key'):
-        api_key = config['openrouter_api_key']
-        if len(api_key) > 8:
-            masked_api_key = api_key[:4] + "*" * (len(api_key) - 8) + api_key[-4:]
-        else:
-            masked_api_key = "*" * len(api_key)
-
-    return APIKeyConfig(openrouter_api_key=masked_api_key)
-
-
-@app.put("/api/apikeys")
-async def update_api_key(request: UpdateAPIKeyRequest):
-    """Update API key configuration."""
-    success = set_openrouter_api_key(request.openrouter_api_key)
-    if not success:
-        raise HTTPException(status_code=500, detail="Failed to save API key")
-    return {"status": "success", "message": "API key updated"}
-
-
-@app.get("/api/conversations", response_model=List[ConversationMetadata])
-async def list_conversations():
-    """List all conversations (metadata only)."""
-    return storage.list_conversations()
-
-
-@app.post("/api/conversations", response_model=Conversation)
-async def create_conversation(request: CreateConversationRequest):
-    """Create a new conversation."""
-    conversation_id = str(uuid.uuid4())
-    conversation = storage.create_conversation(conversation_id)
-    return conversation
-
-
-@app.get("/api/conversations/{conversation_id}", response_model=Conversation)
-async def get_conversation(conversation_id: str):
-    """Get a specific conversation with all its messages."""
-    conversation = storage.get_conversation(conversation_id)
-    if conversation is None:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    return conversation
-
-
-@app.post("/api/conversations/{conversation_id}/message")
-async def send_message(conversation_id: str, request: SendMessageRequest):
+@app.post("/api/council/stream")
+async def council_stream(
+    request: Request,
+    body: CouncilStreamRequest,
+    x_openrouter_api_key: Optional[str] = Header(default=None),
+):
     """
-    Send a message and run the 3-stage council process.
-    Returns the complete response with all stages.
+    Run the 3-stage council process (stateless) and stream it via SSE.
     """
-    # Check if conversation exists
-    conversation = storage.get_conversation(conversation_id)
-    if conversation is None:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+    _check_rate_limit(request.client.host if request.client else "unknown")
+    api_key = _require_openrouter_key(x_openrouter_api_key)
 
-    # Check if this is the first message
-    is_first_message = len(conversation["messages"]) == 0
-
-    # Add user message
-    storage.add_user_message(conversation_id, request.content)
-
-    # If this is the first message, generate a title
-    if is_first_message:
-        title = await generate_conversation_title(request.content)
-        storage.update_conversation_title(conversation_id, title)
-
-    # Run the 3-stage council process
-    stage1_results, stage2_results, stage3_result, metadata = await run_full_council(
-        request.content
-    )
-
-    # Add assistant message with all stages
-    storage.add_assistant_message(
-        conversation_id,
-        stage1_results,
-        stage2_results,
-        stage3_result
-    )
-
-    # Return the complete response with metadata
-    return {
-        "stage1": stage1_results,
-        "stage2": stage2_results,
-        "stage3": stage3_result,
-        "metadata": metadata
-    }
-
-
-@app.post("/api/conversations/{conversation_id}/message/stream")
-async def send_message_stream(conversation_id: str, request: SendMessageRequest):
-    """
-    Send a message and stream the 3-stage council process.
-    Returns Server-Sent Events as each stage completes.
-    """
-    # Check if conversation exists
-    conversation = storage.get_conversation(conversation_id)
-    if conversation is None:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-
-    # Check if this is the first message
-    is_first_message = len(conversation["messages"]) == 0
+    # Basic payload guards for public proxy
+    if not body.content or not body.content.strip():
+        raise HTTPException(status_code=400, detail="content cannot be empty")
+    if len(body.content) > 30_000:
+        raise HTTPException(status_code=413, detail="content too large")
+    if len(body.model_cfg.council_models) == 0 or not body.model_cfg.chairman_model:
+        raise HTTPException(status_code=400, detail="model_config must include council_models and chairman_model")
+    if len(body.model_cfg.council_models) > 10:
+        raise HTTPException(status_code=400, detail="Too many council_models (max 10)")
 
     async def event_generator():
         try:
-            # Add user message
-            storage.add_user_message(conversation_id, request.content)
-
-            # Start title generation in parallel (don't await yet)
-            title_task = None
-            if is_first_message:
-                title_task = asyncio.create_task(generate_conversation_title(request.content))
+            # Title generation (always; frontend can decide whether to use it)
+            title_task = asyncio.create_task(generate_conversation_title(body.content, api_key=api_key))
 
             # Stage 1: Collect responses
             yield f"data: {json.dumps({'type': 'stage1_start'})}\n\n"
-            stage1_results = await stage1_collect_responses(request.content)
+            stage1_results = await stage1_collect_responses(
+                body.content,
+                council_models=body.model_cfg.council_models,
+                api_key=api_key,
+            )
             yield f"data: {json.dumps({'type': 'stage1_complete', 'data': stage1_results})}\n\n"
 
             # Stage 2: Collect rankings
             yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"
-            stage2_results, label_to_model = await stage2_collect_rankings(request.content, stage1_results)
+            stage2_results, label_to_model = await stage2_collect_rankings(
+                body.content,
+                stage1_results,
+                council_models=body.model_cfg.council_models,
+                api_key=api_key,
+            )
             aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
             yield f"data: {json.dumps({'type': 'stage2_complete', 'data': stage2_results, 'metadata': {'label_to_model': label_to_model, 'aggregate_rankings': aggregate_rankings}})}\n\n"
 
             # Stage 3: Synthesize final answer
             yield f"data: {json.dumps({'type': 'stage3_start'})}\n\n"
-            stage3_result = await stage3_synthesize_final(request.content, stage1_results, stage2_results)
-            yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
-
-            # Wait for title generation if it was started
-            if title_task:
-                title = await title_task
-                storage.update_conversation_title(conversation_id, title)
-                yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
-
-            # Save complete assistant message
-            storage.add_assistant_message(
-                conversation_id,
+            stage3_result = await stage3_synthesize_final(
+                body.content,
                 stage1_results,
                 stage2_results,
-                stage3_result
+                chairman_model=body.model_cfg.chairman_model,
+                api_key=api_key,
             )
+            yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
+
+            # Wait for title generation
+            title = await title_task
+            yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
 
             # Send completion event
             yield f"data: {json.dumps({'type': 'complete'})}\n\n"
