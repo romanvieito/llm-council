@@ -55,7 +55,7 @@ export const DEFAULT_MODEL_CONFIG = {
         'anthropic/claude-opus-4.5',
         'google/gemini-3-pro-preview'
       ],
-      chairman_model: 'openai/gpt-5.2-pro'
+      chairman_model: 'openai/gpt-5.2'
     }
   },
   defaults: {
