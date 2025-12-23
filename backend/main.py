@@ -12,7 +12,7 @@ import asyncio
 from . import storage
 from .council import run_full_council, generate_conversation_title, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
 from .openrouter import query_models_parallel, query_model, fetch_available_models
-from .config import get_current_config, save_model_config
+from .config import get_current_config, save_model_config, get_api_keys as get_api_keys_config, set_openrouter_api_key
 
 app = FastAPI(title="LLM Council API")
 
@@ -83,6 +83,16 @@ class UpdateModelConfigRequest(BaseModel):
     presets: Optional[Dict[str, Any]] = None
 
 
+class APIKeyConfig(BaseModel):
+    """API key configuration."""
+    openrouter_api_key: Optional[str] = None
+
+
+class UpdateAPIKeyRequest(BaseModel):
+    """Request to update API key."""
+    openrouter_api_key: str
+
+
 @app.get("/")
 async def root():
     """Health check endpoint."""
@@ -112,6 +122,31 @@ async def update_model_config(request: UpdateModelConfigRequest):
     if not success:
         raise HTTPException(status_code=500, detail="Failed to save model configuration")
     return {"status": "success", "message": "Model configuration updated"}
+
+
+@app.get("/api/apikeys", response_model=APIKeyConfig)
+async def get_api_keys():
+    """Get API key configuration (masked for security)."""
+    config = get_api_keys_config()
+    # Return masked version of API key for security
+    masked_api_key = None
+    if config.get('openrouter_api_key'):
+        api_key = config['openrouter_api_key']
+        if len(api_key) > 8:
+            masked_api_key = api_key[:4] + "*" * (len(api_key) - 8) + api_key[-4:]
+        else:
+            masked_api_key = "*" * len(api_key)
+
+    return APIKeyConfig(openrouter_api_key=masked_api_key)
+
+
+@app.put("/api/apikeys")
+async def update_api_key(request: UpdateAPIKeyRequest):
+    """Update API key configuration."""
+    success = set_openrouter_api_key(request.openrouter_api_key)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to save API key")
+    return {"status": "success", "message": "API key updated"}
 
 
 @app.get("/api/conversations", response_model=List[ConversationMetadata])

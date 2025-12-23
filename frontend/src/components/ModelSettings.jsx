@@ -15,6 +15,12 @@ function ModelSettings({ onClose }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
+  // API Key state
+  const [apiKeys, setApiKeys] = useState(null);
+  const [openrouterApiKey, setOpenrouterApiKey] = useState('');
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [savingApiKey, setSavingApiKey] = useState(false);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -31,6 +37,13 @@ function ModelSettings({ onClose }) {
       setSelectedCouncilModels(config.council_models);
       setSelectedChairmanModel(config.chairman_model);
       setPresets(config.presets || {});
+
+      // Load API keys
+      const keys = await api.getAPIKeys();
+      setApiKeys(keys);
+      if (keys.openrouter_api_key) {
+        setOpenrouterApiKey(keys.openrouter_api_key);
+      }
 
       // Then load available models
       const models = await api.getAvailableModels();
@@ -81,6 +94,32 @@ function ModelSettings({ onClose }) {
       setError(err.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveApiKey = async () => {
+    if (!openrouterApiKey.trim()) {
+      setError('API key cannot be empty');
+      return;
+    }
+
+    try {
+      setSavingApiKey(true);
+      setError(null);
+
+      await api.updateAPIKey(openrouterApiKey.trim());
+
+      // Reload API keys to get the masked version
+      const keys = await api.getAPIKeys();
+      setApiKeys(keys);
+      setOpenrouterApiKey(keys.openrouter_api_key);
+
+      setError('API key saved successfully!');
+      setTimeout(() => setError(null), 3000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSavingApiKey(false);
     }
   };
 
@@ -196,6 +235,42 @@ function ModelSettings({ onClose }) {
         )}
 
         <div className="model-settings-content">
+          <div className="api-keys-section">
+            <h3>API Keys</h3>
+            <div className="api-key-input-group">
+              <label htmlFor="openrouter-api-key">OpenRouter API Key</label>
+              <div className="api-key-input-container">
+                <input
+                  id="openrouter-api-key"
+                  type={showApiKey ? "text" : "password"}
+                  value={openrouterApiKey}
+                  onChange={(e) => setOpenrouterApiKey(e.target.value)}
+                  placeholder="Enter your OpenRouter API key"
+                  className="api-key-input"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  className="toggle-visibility-btn"
+                  title={showApiKey ? "Hide API key" : "Show API key"}
+                >
+                  {showApiKey ? "🙈" : "👁️"}
+                </button>
+                <button
+                  onClick={handleSaveApiKey}
+                  disabled={!openrouterApiKey.trim() || savingApiKey}
+                  className="save-api-key-btn"
+                >
+                  {savingApiKey ? 'Saving...' : 'Save Key'}
+                </button>
+              </div>
+              <small className="api-key-help">
+                Get your API key from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer">OpenRouter</a>.
+                Your key is stored locally and never sent anywhere except OpenRouter.
+              </small>
+            </div>
+          </div>
+
           <div className="presets-section">
             <div className="section-header">
               <h3>Configuration Presets</h3>

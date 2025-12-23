@@ -151,4 +151,32 @@ export const api = {
     }
     return response.json();
   },
+
+  /**
+   * Get API key configuration (masked).
+   */
+  async getAPIKeys() {
+    const response = await fetch(`${API_BASE}/api/apikeys`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch API keys');
+    }
+    return response.json();
+  },
+
+  /**
+   * Update API key configuration.
+   */
+  async updateAPIKey(openrouterApiKey) {
+    const response = await fetch(`${API_BASE}/api/apikeys`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ openrouter_api_key: openrouterApiKey }),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to update API key');
+    }
+    return response.json();
+  },
 };

@@ -62,3 +62,4 @@ If you get connection errors:
 1. Make sure your Neon database is not paused
 2. Verify the DATABASE_URL is correct
 3. Check that your IP is allowlisted in Neon (or use SSL mode)
+

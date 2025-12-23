@@ -22,3 +22,4 @@ CREATE TABLE IF NOT EXISTS messages (
 -- Indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_conversations_created_at ON conversations(created_at DESC);
+
