@@ -18,6 +18,7 @@ function App() {
   const [currentConversation, setCurrentConversation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showModelSettings, setShowModelSettings] = useState(false);
+  const [modelSettingsTab, setModelSettingsTab] = useState('model-config');
   const [hasApiKey, setHasApiKey] = useState(!!getOpenRouterKey());
 
 
@@ -70,7 +71,8 @@ function App() {
     setCurrentConversationId(id);
   };
 
-  const handleOpenModelSettings = () => {
+  const handleOpenModelSettings = (initialTab = 'model-config') => {
+    setModelSettingsTab(initialTab);
     setShowModelSettings(true);
   };
 
@@ -269,7 +271,7 @@ function App() {
         onOpenModelSettings={handleOpenModelSettings}
       />
       {showModelSettings && (
-        <ModelSettings onClose={handleCloseModelSettings} />
+        <ModelSettings onClose={handleCloseModelSettings} initialTab={modelSettingsTab} />
       )}
     </div>
   );

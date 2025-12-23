@@ -128,7 +128,7 @@ export default function ChatInterface({
             Missing OpenRouter API key. Add one in{' '}
             <button
               type="button"
-              onClick={onOpenModelSettings}
+              onClick={() => onOpenModelSettings('api-keys')}
               disabled={isLoading}
               style={{
                 background: 'none',
