@@ -47,15 +47,6 @@ export const DEFAULT_MODEL_CONFIG = {
         'google/gemini-3-flash-preview'
       ],
       chairman_model: 'openai/gpt-5.2-chat'
-    },
-    "Heavy": {
-      council_models: [
-        'x-ai/grok-4',
-        'openai/gpt-5.2',
-        'anthropic/claude-opus-4.5',
-        'google/gemini-3-pro-preview'
-      ],
-      chairman_model: 'openai/gpt-5.2'
     }
   },
   defaults: {
