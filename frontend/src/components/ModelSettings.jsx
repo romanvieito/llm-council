@@ -114,11 +114,37 @@ function ModelSettings({ onClose }) {
     }
   };
 
-  const applyPreset = (name) => {
+  const applyPreset = async (name) => {
     const preset = presets[name];
-    if (preset) {
-      setSelectedCouncilModels(preset.council_models);
-      setSelectedChairmanModel(preset.chairman_model);
+    if (!preset) return;
+
+    // Update UI immediately
+    setSelectedCouncilModels(preset.council_models);
+    setSelectedChairmanModel(preset.chairman_model);
+
+    // Persist selection so the backend actually uses it for new messages
+    try {
+      setSaving(true);
+      setError(null);
+
+      await api.updateModelConfig({
+        council_models: preset.council_models,
+        chairman_model: preset.chairman_model,
+        presets: presets,
+      });
+
+      setCurrentConfig({
+        council_models: preset.council_models,
+        chairman_model: preset.chairman_model,
+        presets: presets,
+      });
+
+      setError(`Preset "${name}" applied.`);
+      setTimeout(() => setError(null), 3000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
     }
   };
 
