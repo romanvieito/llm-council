@@ -243,6 +243,29 @@
   cursor: pointer;
 }
 
+.clear-button {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+}
+
+.clear-button:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--text-primary);
+}
+
+.clear-button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 .presets-list {
   display: flex;
   flex-wrap: wrap;
@@ -352,6 +375,12 @@
   background: rgba(245, 166, 35, 0.1);
   color: var(--accent-orange);
   border-color: rgba(245, 166, 35, 0.2);
+}
+
+.no-models-text {
+  color: var(--text-tertiary);
+  font-size: 12px;
+  font-style: italic;
 }
 
 .models-grid {

@@ -225,6 +225,13 @@ function ModelSettings({ onClose, initialTab }) {
     }
   };
 
+  const handleClear = () => {
+    setSelectedCouncilModels([]);
+    setSelectedChairmanModel('');
+    setError('All models unselected.');
+    setTimeout(() => setError(null), 3000);
+  };
+
   const filteredModels = availableModels.filter(model =>
     model.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     model.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -316,7 +323,7 @@ function ModelSettings({ onClose, initialTab }) {
                     disabled={!newPresetName.trim() || saving}
                     className="save-preset-btn"
                   >
-                    Save Current
+                    Save Config
                   </button>
                 </div>
               </div>
@@ -357,7 +364,17 @@ function ModelSettings({ onClose, initialTab }) {
             </div>
 
             <div className="current-config">
-              <h3>Current Configuration</h3>
+              <div className="section-header">
+                <h3>Current Configuration</h3>
+                <button
+                  className="clear-button"
+                  onClick={handleClear}
+                  disabled={selectedCouncilModels.length === 0 && !selectedChairmanModel}
+                  title="Clear all selected models"
+                >
+                  Clear All
+                </button>
+              </div>
               <div className="config-summary">
                 <div className="config-item">
                   <strong>Council Models ({selectedCouncilModels.length})</strong>
