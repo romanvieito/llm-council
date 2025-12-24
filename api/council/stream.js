@@ -173,12 +173,69 @@ export default async function handler(req, res) {
       (typeof modelCfg.chairman_model === 'string' && modelCfg.chairman_model) ||
       'google/gemini-3-pro-preview';
 
+    // Conversation context (Stage 3-only history is built client-side)
+    const rawConversationContext = body.conversation_context;
+    let conversationContext = [];
+    if (rawConversationContext != null) {
+      if (!Array.isArray(rawConversationContext)) {
+        sseEvent(res, { type: 'error', message: 'conversation_context must be a list' });
+        res.end();
+        return;
+      }
+
+      const maxTotalChars = 25_000; // allow some buffer over frontend limit
+      const maxMessageChars = 5_000;
+      let totalChars = 0;
+
+      for (let i = 0; i < rawConversationContext.length; i++) {
+        const msg = rawConversationContext[i];
+        if (!msg || typeof msg !== 'object') {
+          sseEvent(res, { type: 'error', message: `conversation_context[${i}] must be an object` });
+          res.end();
+          return;
+        }
+
+        const role = msg.role;
+        const c = msg.content;
+
+        if (role !== 'user' && role !== 'assistant') {
+          sseEvent(res, { type: 'error', message: `conversation_context[${i}] role must be 'user' or 'assistant'` });
+          res.end();
+          return;
+        }
+
+        if (typeof c !== 'string' || !c.trim()) {
+          sseEvent(res, { type: 'error', message: `conversation_context[${i}] content must be non-empty string` });
+          res.end();
+          return;
+        }
+
+        if (c.length > maxMessageChars) {
+          sseEvent(res, { type: 'error', message: `conversation_context[${i}] content too large (max ${maxMessageChars} chars)` });
+          res.end();
+          return;
+        }
+
+        totalChars += c.length;
+        if (totalChars > maxTotalChars) {
+          sseEvent(res, { type: 'error', message: `conversation_context total content too large (max ${maxTotalChars} chars)` });
+          res.end();
+          return;
+        }
+
+        // Normalize shape to avoid passing unexpected keys downstream
+        conversationContext.push({ role, content: c });
+      }
+    }
+
+    const isFirstMessage = !!body.is_first_message;
+
     // Stage 1: individual responses
     sseEvent(res, { type: 'stage1_start' });
     const stage1Map = await queryModelsParallel({
       apiKey,
       models: councilModels,
-      messages: [{ role: 'user', content }],
+      messages: [...conversationContext, { role: 'user', content }],
       timeoutMs: 120_000,
     });
     const stage1Results = [];
@@ -213,7 +270,7 @@ export default async function handler(req, res) {
     const stage2Map = await queryModelsParallel({
       apiKey,
       models: councilModels,
-      messages: [{ role: 'user', content: rankingPrompt }],
+      messages: [...conversationContext, { role: 'user', content: rankingPrompt }],
       timeoutMs: 120_000,
     });
 
@@ -251,7 +308,7 @@ export default async function handler(req, res) {
       const resp = await queryOpenRouter({
         apiKey,
         model: chairmanModel,
-        messages: [{ role: 'user', content: chairmanPrompt }],
+        messages: [...conversationContext, { role: 'user', content: chairmanPrompt }],
         timeoutMs: 120_000,
       });
       stage3 = { model: chairmanModel, response: resp?.content ?? '' };
@@ -261,22 +318,24 @@ export default async function handler(req, res) {
 
     sseEvent(res, { type: 'stage3_complete', data: stage3 });
 
-    // Optional title generation (fast)
-    try {
-      const titlePrompt = `Generate a very short title (3-5 words maximum) that summarizes the following question.\nThe title should be concise and descriptive. Do not use quotes or punctuation in the title.\n\nQuestion: ${content}\n\nTitle:`;
-      const titleResp = await queryOpenRouter({
-        apiKey,
-        model: 'google/gemini-2.5-flash',
-        messages: [{ role: 'user', content: titlePrompt }],
-        timeoutMs: 30_000,
-      });
-      const title = String(titleResp?.content ?? 'New Conversation')
-        .trim()
-        .replace(/^["']|["']$/g, '')
-        .slice(0, 50);
-      sseEvent(res, { type: 'title_complete', data: { title: title || 'New Conversation' } });
-    } catch {
-      // ignore
+    // Optional title generation (fast) - only for first message
+    if (isFirstMessage) {
+      try {
+        const titlePrompt = `Generate a very short title (3-5 words maximum) that summarizes the following question.\nThe title should be concise and descriptive. Do not use quotes or punctuation in the title.\n\nQuestion: ${content}\n\nTitle:`;
+        const titleResp = await queryOpenRouter({
+          apiKey,
+          model: 'google/gemini-2.5-flash',
+          messages: [{ role: 'user', content: titlePrompt }],
+          timeoutMs: 30_000,
+        });
+        const title = String(titleResp?.content ?? 'New Conversation')
+          .trim()
+          .replace(/^["']|["']$/g, '')
+          .slice(0, 50);
+        sseEvent(res, { type: 'title_complete', data: { title: title || 'New Conversation' } });
+      } catch {
+        // ignore
+      }
     }
 
     sseEvent(res, { type: 'complete' });
