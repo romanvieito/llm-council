@@ -35,6 +35,7 @@ export const api = {
           content,
           model_config: modelConfig,
           is_first_message: !!options.isFirstMessage,
+          conversation_context: options.conversationContext || [],
         }),
       }
     );

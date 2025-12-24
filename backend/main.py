@@ -64,6 +64,8 @@ class CouncilStreamRequest(BaseModel):
     model_cfg: ModelConfigPayload = Field(alias="model_config")
     # Optional future extension; not used by current orchestration prompts
     conversation_context: Optional[List[Dict[str, Any]]] = None
+    # Whether this is the first message in the conversation (for title generation)
+    is_first_message: Optional[bool] = None
 
     model_config = {
         "populate_by_name": True,
@@ -148,10 +150,41 @@ async def council_stream(
     if len(body.model_cfg.council_models) > 10:
         raise HTTPException(status_code=400, detail="Too many council_models (max 10)")
 
+    # Validate conversation_context if provided
+    if body.conversation_context is not None:
+        if not isinstance(body.conversation_context, list):
+            raise HTTPException(status_code=400, detail="conversation_context must be a list")
+
+        total_chars = 0
+        max_total_chars = 25000  # Allow some buffer over frontend 20k limit
+        max_message_chars = 5000  # Per-message limit
+
+        for i, msg in enumerate(body.conversation_context):
+            if not isinstance(msg, dict):
+                raise HTTPException(status_code=400, detail=f"conversation_context[{i}] must be an object")
+
+            role = msg.get('role')
+            content = msg.get('content')
+
+            if role not in ['user', 'assistant']:
+                raise HTTPException(status_code=400, detail=f"conversation_context[{i}] role must be 'user' or 'assistant'")
+
+            if not content or not isinstance(content, str) or not content.strip():
+                raise HTTPException(status_code=400, detail=f"conversation_context[{i}] content must be non-empty string")
+
+            if len(content) > max_message_chars:
+                raise HTTPException(status_code=400, detail=f"conversation_context[{i}] content too large (max {max_message_chars} chars)")
+
+            total_chars += len(content)
+            if total_chars > max_total_chars:
+                raise HTTPException(status_code=400, detail=f"conversation_context total content too large (max {max_total_chars} chars)")
+
     async def event_generator():
         try:
-            # Title generation (always; frontend can decide whether to use it)
-            title_task = asyncio.create_task(generate_conversation_title(body.content, api_key=api_key))
+            # Title generation only for first message
+            title_task = None
+            if body.is_first_message:
+                title_task = asyncio.create_task(generate_conversation_title(body.content, api_key=api_key))
 
             # Stage 1: Collect responses
             yield f"data: {json.dumps({'type': 'stage1_start'})}\n\n"
@@ -159,6 +192,7 @@ async def council_stream(
                 body.content,
                 council_models=body.model_cfg.council_models,
                 api_key=api_key,
+                conversation_context=body.conversation_context,
             )
             yield f"data: {json.dumps({'type': 'stage1_complete', 'data': stage1_results})}\n\n"
 
@@ -169,6 +203,7 @@ async def council_stream(
                 stage1_results,
                 council_models=body.model_cfg.council_models,
                 api_key=api_key,
+                conversation_context=body.conversation_context,
             )
             aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
             yield f"data: {json.dumps({'type': 'stage2_complete', 'data': stage2_results, 'metadata': {'label_to_model': label_to_model, 'aggregate_rankings': aggregate_rankings}})}\n\n"
@@ -181,12 +216,14 @@ async def council_stream(
                 stage2_results,
                 chairman_model=body.model_cfg.chairman_model,
                 api_key=api_key,
+                conversation_context=body.conversation_context,
             )
             yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
 
-            # Wait for title generation
-            title = await title_task
-            yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
+            # Wait for title generation (only if it was started)
+            if title_task:
+                title = await title_task
+                yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
 
             # Send completion event
             yield f"data: {json.dumps({'type': 'complete'})}\n\n"

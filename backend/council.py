@@ -1,6 +1,6 @@
 """3-stage LLM Council orchestration."""
 
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 from .openrouter import query_models_parallel, query_model
 
 
@@ -8,17 +8,20 @@ async def stage1_collect_responses(
     user_query: str,
     council_models: List[str],
     api_key: str,
+    conversation_context: Optional[List[Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
     """
     Stage 1: Collect individual responses from all council models.
 
     Args:
         user_query: The user's question
+        conversation_context: Optional list of prior conversation messages
 
     Returns:
         List of dicts with 'model' and 'response' keys
     """
-    messages = [{"role": "user", "content": user_query}]
+    # Build messages with conversation context + current user query
+    messages = (conversation_context or []) + [{"role": "user", "content": user_query}]
 
     # Query all models in parallel
     responses = await query_models_parallel(council_models, messages, api_key=api_key)
@@ -40,6 +43,7 @@ async def stage2_collect_rankings(
     stage1_results: List[Dict[str, Any]],
     council_models: List[str],
     api_key: str,
+    conversation_context: Optional[List[Dict[str, Any]]] = None,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
     """
     Stage 2: Each model ranks the anonymized responses.
@@ -47,6 +51,7 @@ async def stage2_collect_rankings(
     Args:
         user_query: The original user query
         stage1_results: Results from Stage 1
+        conversation_context: Optional list of prior conversation messages
 
     Returns:
         Tuple of (rankings list, label_to_model mapping)
@@ -97,7 +102,8 @@ FINAL RANKING:
 
 Now provide your evaluation and ranking:"""
 
-    messages = [{"role": "user", "content": ranking_prompt}]
+    # Build messages with conversation context + ranking prompt
+    messages = (conversation_context or []) + [{"role": "user", "content": ranking_prompt}]
 
     # Get rankings from all council models in parallel
     responses = await query_models_parallel(council_models, messages, api_key=api_key)
@@ -123,6 +129,7 @@ async def stage3_synthesize_final(
     stage2_results: List[Dict[str, Any]],
     chairman_model: str,
     api_key: str,
+    conversation_context: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """
     Stage 3: Chairman synthesizes final response.
@@ -163,7 +170,8 @@ Your task as Chairman is to synthesize all of this information into a single, co
 
 Provide a clear, well-reasoned final answer that represents the council's collective wisdom:"""
 
-    messages = [{"role": "user", "content": chairman_prompt}]
+    # Build messages with conversation context + chairman prompt
+    messages = (conversation_context or []) + [{"role": "user", "content": chairman_prompt}]
 
     # Query the chairman model
     response = await query_model(chairman_model, messages, api_key=api_key)

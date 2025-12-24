@@ -116,6 +116,39 @@ function App() {
         messages: [...prev.messages, assistantMessage],
       }));
 
+      // Build conversation context from prior messages (Stage 3-only history)
+      // Include user messages + assistant stage3.response only, apply rolling window + size cap
+      const buildConversationContext = (messages) => {
+        const context = [];
+        const maxTurns = 8; // Keep last 8 user+assistant pairs
+        const maxTotalChars = 20000; // 20k char budget as token proxy
+        let totalChars = 0;
+
+        // Process messages in reverse order to get the most recent ones first
+        const priorMessages = messages.filter(msg =>
+          msg.role === 'user' || (msg.role === 'assistant' && msg.stage3?.response)
+        );
+
+        for (let i = priorMessages.length - 1; i >= 0 && context.length < maxTurns * 2; i--) {
+          const msg = priorMessages[i];
+          const content = msg.role === 'user' ? msg.content : msg.stage3.response;
+          const contextMsg = { role: msg.role, content };
+
+          // Check if adding this message would exceed the character limit
+          const msgChars = JSON.stringify(contextMsg).length;
+          if (totalChars + msgChars > maxTotalChars) {
+            break;
+          }
+
+          context.unshift(contextMsg); // Add to front to maintain chronological order
+          totalChars += msgChars;
+        }
+
+        return context;
+      };
+
+      const conversationContext = buildConversationContext(currentConversation.messages);
+
       // Send message with streaming
       await api.sendMessageStream(
         currentConversationId,
@@ -228,7 +261,7 @@ function App() {
             console.log('Unknown event type:', eventType);
         }
       },
-      { isFirstMessage }
+      { isFirstMessage, conversationContext }
       );
     } catch (error) {
       console.error('Failed to send message:', error);
