@@ -63,3 +63,5 @@ If you get connection errors:
 2. Verify the DATABASE_URL is correct
 3. Check that your IP is allowlisted in Neon (or use SSL mode)
 
+
+
