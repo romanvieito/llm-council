@@ -121,3 +121,67 @@
   font-size: 13px;
   color: var(--text-secondary);
 }
+
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+  .aggregate-rankings {
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .aggregate-item {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .rank-position {
+    font-size: 14px;
+    min-width: 32px;
+  }
+
+  .rank-model {
+    font-size: 12px;
+    flex-basis: 100%;
+    order: 3;
+  }
+
+  .rank-score,
+  .rank-count {
+    font-size: 12px;
+  }
+
+  .stage-description {
+    font-size: 12px;
+  }
+
+  .parsed-ranking ol {
+    padding-left: 20px;
+  }
+
+  .parsed-ranking li {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .aggregate-rankings {
+    padding: 12px;
+  }
+
+  .aggregate-item {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .rank-position {
+    font-size: 13px;
+    min-width: 28px;
+  }
+
+  .rank-model,
+  .rank-score,
+  .rank-count {
+    font-size: 11px;
+  }
+}

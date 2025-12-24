@@ -224,3 +224,94 @@
   background: var(--text-primary);
   color: var(--bg-primary);
 }
+
+/* Mobile menu button */
+.mobile-menu-button {
+  display: none;
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 1001;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  width: 44px;
+  height: 44px;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--text-primary);
+  box-shadow: var(--shadow-md);
+  transition: all var(--transition-fast);
+}
+
+.mobile-menu-button:hover {
+  background: var(--bg-hover);
+  border-color: var(--text-primary);
+}
+
+.mobile-menu-button:active {
+  transform: scale(0.95);
+}
+
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+  .mobile-menu-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .messages-container {
+    padding: 80px 16px 16px 16px;
+  }
+
+  .message-group {
+    margin-bottom: 32px;
+  }
+
+  .user-message .message-content {
+    max-width: 100%;
+  }
+
+  .input-form {
+    padding: 16px;
+    gap: 12px;
+  }
+
+  .message-input {
+    padding: 12px 16px;
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+
+  .send-button {
+    padding: 12px 24px;
+    font-size: 14px;
+  }
+
+  .empty-state {
+    padding: 20px;
+  }
+
+  .empty-state h2 {
+    font-size: 24px;
+  }
+
+  .empty-state p {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .input-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .send-button {
+    width: 100%;
+  }
+
+  .message-input {
+    min-height: 80px;
+  }
+}

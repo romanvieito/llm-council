@@ -11,3 +11,10 @@
   color: var(--text-primary);
   font-family: var(--font-sans);
 }
+
+/* Mobile responsive layout */
+@media (max-width: 768px) {
+  .app {
+    flex-direction: column;
+  }
+}

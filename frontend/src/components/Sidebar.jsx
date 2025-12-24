@@ -8,9 +8,18 @@ export default function Sidebar({
   onDeleteConversation,
   onNewConversation,
   onOpenModelSettings,
+  isOpen,
+  onClose,
 }) {
+  const handleConversationSelect = (id) => {
+    onSelectConversation(id);
+    onClose(); // Close sidebar on mobile after selection
+  };
+
   return (
-    <div className="sidebar">
+    <>
+      {isOpen && <div className="sidebar-overlay" onClick={onClose} />}
+      <div className={`sidebar ${isOpen ? 'open' : ''}`}>
       <div className="sidebar-header">
         <div className="header-top">
           <h1>Ava LLM</h1>
@@ -36,7 +45,7 @@ export default function Sidebar({
             >
               <div
                 className="conversation-content"
-                onClick={() => onSelectConversation(conv.id)}
+                onClick={() => handleConversationSelect(conv.id)}
               >
                 <div className="conversation-title">
                   {conv.title || 'New Conversation'}
@@ -62,5 +71,6 @@ export default function Sidebar({
         )}
       </div>
     </div>
+    </>
   );
 }

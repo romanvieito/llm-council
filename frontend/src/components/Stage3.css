@@ -38,3 +38,34 @@
   line-height: 1.8;
   font-size: 15px;
 }
+
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+  .final-response {
+    padding: 16px;
+  }
+
+  .chairman-label {
+    font-size: 11px;
+    margin-bottom: 12px;
+  }
+
+  .final-text {
+    font-size: 14px;
+    line-height: 1.7;
+  }
+}
+
+@media (max-width: 480px) {
+  .final-response {
+    padding: 12px;
+  }
+
+  .chairman-label {
+    font-size: 10px;
+  }
+
+  .final-text {
+    font-size: 13px;
+  }
+}

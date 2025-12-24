@@ -21,6 +21,7 @@ function App() {
   const [showModelSettings, setShowModelSettings] = useState(false);
   const [modelSettingsTab, setModelSettingsTab] = useState('model-config');
   const [hasApiKey, setHasApiKey] = useState(!!getOpenRouterKey());
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
 
   // Load conversations on mount
@@ -359,6 +360,14 @@ function App() {
     }
   }, [currentConversation]);
 
+  const handleToggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
+
+  const handleCloseSidebar = () => {
+    setIsSidebarOpen(false);
+  };
+
   return (
     <div className="app">
       <Sidebar
@@ -368,6 +377,8 @@ function App() {
         onDeleteConversation={handleDeleteConversation}
         onNewConversation={handleNewConversation}
         onOpenModelSettings={handleOpenModelSettings}
+        isOpen={isSidebarOpen}
+        onClose={handleCloseSidebar}
       />
       <ChatInterface
         conversation={currentConversation}
@@ -375,6 +386,7 @@ function App() {
         isLoading={isLoading}
         hasApiKey={hasApiKey}
         onOpenModelSettings={handleOpenModelSettings}
+        onToggleSidebar={handleToggleSidebar}
       />
       {showModelSettings && (
         <ModelSettings onClose={handleCloseModelSettings} initialTab={modelSettingsTab} />
