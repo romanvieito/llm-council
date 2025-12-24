@@ -48,24 +48,53 @@ export const api = {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
 
+    // Robust SSE parsing: network chunks may split a single SSE event across reads.
+    // Buffer until we have complete SSE messages separated by a blank line.
+    let buffer = '';
+    let sawComplete = false;
+
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        // Flush any remaining bytes.
+        buffer += decoder.decode();
+        break;
+      }
 
-      const chunk = decoder.decode(value);
-      const lines = chunk.split('\n');
+      // Normalize CRLF just in case.
+      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
 
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6);
-          try {
-            const event = JSON.parse(data);
-            onEvent(event.type, event);
-          } catch (e) {
-            console.error('Failed to parse SSE event:', e);
-          }
+      // Process complete SSE messages. SSE messages are delimited by a blank line.
+      // Each message can contain multiple `data:` lines; join them with \n (SSE spec).
+      let boundaryIndex;
+      // eslint-disable-next-line no-cond-assign
+      while ((boundaryIndex = buffer.indexOf('\n\n')) !== -1) {
+        const rawMessage = buffer.slice(0, boundaryIndex);
+        buffer = buffer.slice(boundaryIndex + 2);
+
+        const dataLines = rawMessage
+          .split('\n')
+          .filter((line) => line.startsWith('data:'))
+          .map((line) => line.replace(/^data:\s?/, ''));
+
+        if (dataLines.length === 0) continue;
+
+        const data = dataLines.join('\n');
+        try {
+          const event = JSON.parse(data);
+          if (event?.type === 'complete') sawComplete = true;
+          onEvent(event.type, event);
+        } catch (e) {
+          // If parsing fails, keep going. This should be rare now that we buffer properly.
+          console.error('Failed to parse SSE event:', e);
         }
       }
+    }
+
+    // If the stream ended without a `complete` event (e.g. proxy truncation),
+    // emit a synthetic completion so the UI can finalize.
+    if (!sawComplete) {
+      onEvent('complete', { type: 'complete', synthetic: true });
     }
   },
 

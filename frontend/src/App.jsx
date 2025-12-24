@@ -86,6 +86,7 @@ function App() {
     if (!currentConversationId) return;
 
     setIsLoading(true);
+    let streamFinished = false;
     try {
       const isFirstMessage = (currentConversation?.messages?.length || 0) === 0;
 
@@ -209,6 +210,9 @@ function App() {
               const lastMsg = messages[messages.length - 1];
               lastMsg.stage3 = event.data;
               lastMsg.loading.stage3 = false;
+              // Defensive: if earlier stage completion was missed, don't leave spinners running.
+              lastMsg.loading.stage1 = false;
+              lastMsg.loading.stage2 = false;
               return { ...prev, messages };
             });
             break;
@@ -236,6 +240,14 @@ function App() {
             // Stream complete, persist conversation locally and refresh sidebar metadata
             setCurrentConversation((prev) => {
               if (!prev) return prev;
+              // Ensure no stage spinners remain stuck.
+              const messages = [...prev.messages];
+              const lastMsg = messages[messages.length - 1];
+              if (lastMsg?.loading) {
+                lastMsg.loading.stage1 = false;
+                lastMsg.loading.stage2 = false;
+                lastMsg.loading.stage3 = false;
+              }
               try {
                 saveLocalConversation(prev);
               } catch (e) {
@@ -254,6 +266,18 @@ function App() {
 
           case 'error':
             console.error('Stream error:', event.message);
+            // Ensure we clear any stage spinners on error.
+            setCurrentConversation((prev) => {
+              if (!prev) return prev;
+              const messages = [...prev.messages];
+              const lastMsg = messages[messages.length - 1];
+              if (lastMsg?.loading) {
+                lastMsg.loading.stage1 = false;
+                lastMsg.loading.stage2 = false;
+                lastMsg.loading.stage3 = false;
+              }
+              return { ...prev, messages };
+            });
             setIsLoading(false);
             break;
 
@@ -263,6 +287,7 @@ function App() {
       },
       { isFirstMessage, conversationContext }
       );
+      streamFinished = true;
     } catch (error) {
       console.error('Failed to send message:', error);
       if (String(error?.message || error).includes('Missing OpenRouter API key')) {
@@ -273,6 +298,33 @@ function App() {
         ...prev,
         messages: prev.messages.slice(0, -2),
       }));
+      setIsLoading(false);
+    } finally {
+      // Guaranteed finalization in case the `complete` SSE event was dropped.
+      if (streamFinished) {
+        setCurrentConversation((prev) => {
+          if (!prev) return prev;
+          const messages = [...prev.messages];
+          const lastMsg = messages[messages.length - 1];
+          if (lastMsg?.loading) {
+            lastMsg.loading.stage1 = false;
+            lastMsg.loading.stage2 = false;
+            lastMsg.loading.stage3 = false;
+          }
+          try {
+            saveLocalConversation(prev);
+          } catch (e) {
+            console.error('Failed to persist conversation:', e);
+          }
+          return { ...prev, messages };
+        });
+        try {
+          const convs = listLocalConversations();
+          setConversations(convs);
+        } catch (error) {
+          console.error('Failed to load conversations:', error);
+        }
+      }
       setIsLoading(false);
     }
   };
