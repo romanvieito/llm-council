@@ -8,6 +8,7 @@ import {
   getConversation as getLocalConversation,
   createConversation as createLocalConversation,
   saveConversation as saveLocalConversation,
+  deleteConversation as deleteLocalConversation,
   getOpenRouterKey,
 } from './localStore';
 import './App.css';
@@ -69,6 +70,25 @@ function App() {
 
   const handleSelectConversation = (id) => {
     setCurrentConversationId(id);
+  };
+
+  const handleDeleteConversation = (id) => {
+    try {
+      // Delete from local storage
+      deleteLocalConversation(id);
+
+      // Update conversations list
+      const updatedConversations = conversations.filter(conv => conv.id !== id);
+      setConversations(updatedConversations);
+
+      // If the deleted conversation was the current one, clear it
+      if (currentConversationId === id) {
+        setCurrentConversationId(null);
+        setCurrentConversation(null);
+      }
+    } catch (error) {
+      console.error('Failed to delete conversation:', error);
+    }
   };
 
   const handleOpenModelSettings = (initialTab = 'model-config') => {
@@ -345,6 +365,7 @@ function App() {
         conversations={conversations}
         currentConversationId={currentConversationId}
         onSelectConversation={handleSelectConversation}
+        onDeleteConversation={handleDeleteConversation}
         onNewConversation={handleNewConversation}
         onOpenModelSettings={handleOpenModelSettings}
       />

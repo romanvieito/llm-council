@@ -160,6 +160,16 @@ export const localStore = {
     const updated = { ...conv, title: title || conv.title };
     localStore.saveConversation(updated);
   },
+
+  deleteConversation(id) {
+    // Remove the conversation data
+    localStorage.removeItem(localStore._conversationKey(id));
+
+    // Remove from the index
+    const current = localStore.listConversations();
+    const next = current.filter((c) => c.id !== id);
+    localStorage.setItem(KEY_CONV_INDEX, JSON.stringify(next));
+  },
 };
 
 // Backwards-compatible named exports (older code imported functions directly).
@@ -189,4 +199,7 @@ export function saveConversation(conversation) {
 }
 export function updateConversationTitle(id, title) {
   return localStore.updateConversationTitle(id, title);
+}
+export function deleteConversation(id) {
+  return localStore.deleteConversation(id);
 }

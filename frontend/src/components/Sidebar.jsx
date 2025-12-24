@@ -5,6 +5,7 @@ export default function Sidebar({
   conversations,
   currentConversationId,
   onSelectConversation,
+  onDeleteConversation,
   onNewConversation,
   onOpenModelSettings,
 }) {
@@ -32,14 +33,30 @@ export default function Sidebar({
               className={`conversation-item ${
                 conv.id === currentConversationId ? 'active' : ''
               }`}
-              onClick={() => onSelectConversation(conv.id)}
             >
-              <div className="conversation-title">
-                {conv.title || 'New Conversation'}
+              <div
+                className="conversation-content"
+                onClick={() => onSelectConversation(conv.id)}
+              >
+                <div className="conversation-title">
+                  {conv.title || 'New Conversation'}
+                </div>
+                <div className="conversation-meta">
+                  {conv.message_count} messages
+                </div>
               </div>
-              <div className="conversation-meta">
-                {conv.message_count} messages
-              </div>
+              <button
+                className="delete-conversation-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (window.confirm('Are you sure you want to delete this conversation?')) {
+                    onDeleteConversation(conv.id);
+                  }
+                }}
+                title="Delete conversation"
+              >
+                🗑️
+              </button>
             </div>
           ))
         )}
