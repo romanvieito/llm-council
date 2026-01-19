@@ -32,21 +32,30 @@ function randomId() {
 export const DEFAULT_MODEL_CONFIG = {
   // Mirrors current repo defaults for a good OOTB experience.
   council_models: [
-    'x-ai/grok-4.1-fast',
+    'deepseek/deepseek-v3.2',
+    'anthropic/claude-sonnet-4',
     'openai/gpt-5.2-chat',
-    'anthropic/claude-haiku-4.5',
     'google/gemini-3-flash-preview'
   ],
-  chairman_model: 'openai/gpt-5.2-chat',
+  chairman_model: 'deepseek/deepseek-v3.2',
   presets: {
     "Fast": {
       council_models: [
-        'x-ai/grok-4.1-fast',
-        'openai/gpt-5.2-chat',
-        'anthropic/claude-haiku-4.5',
-        'google/gemini-3-flash-preview'
+        'deepseek/deepseek-v3.2',
+        'anthropic/claude-sonnet-4',
+        'minimax/minimax-01',
+        'nvidia/nemotron-4-340b-instruct'
       ],
-      chairman_model: 'openai/gpt-5.2-chat'
+      chairman_model: 'deepseek/deepseek-v3.2'
+    },
+    "Reliable": {
+      council_models: [
+        'anthropic/claude-sonnet-4',
+        'openai/gpt-5.2-chat',
+        'google/gemini-3-flash-preview',
+        'meta-llama/llama-3.1-70b-instruct'
+      ],
+      chairman_model: 'anthropic/claude-sonnet-4'
     }
   },
   defaults: {
