@@ -102,18 +102,32 @@ async function queryOpenRouter({ apiKey, model, messages, timeoutMs = 120_000 })
 async function queryModelsParallel({ apiKey, models, messages, timeoutMs }) {
   const entries = await Promise.allSettled(
     (models || []).map(async (m) => {
-      const r = await queryOpenRouter({ apiKey, model: m, messages, timeoutMs });
-      return [m, r];
+      try {
+        const r = await queryOpenRouter({ apiKey, model: m, messages, timeoutMs });
+        return [m, r];
+      } catch (error) {
+        console.error(`Model ${m} failed:`, error.message);
+        throw error;
+      }
     })
   );
 
   const out = new Map();
+  const errors = [];
   for (const e of entries) {
     if (e.status === 'fulfilled') {
       const [model, resp] = e.value;
       out.set(model, resp);
+    } else {
+      errors.push(e.reason?.message || 'Unknown error');
     }
   }
+
+  // Log errors if all models failed
+  if (out.size === 0 && errors.length > 0) {
+    console.error('All models failed to respond:', errors);
+  }
+
   return out;
 }
 
@@ -168,10 +182,33 @@ export default async function handler(req, res) {
             'openai/gpt-5.2-chat',
             'anthropic/claude-haiku-4.5',
             'google/gemini-3-flash-preview',
+            // Fallback models that should be more widely available
+            'microsoft/wizardlm-2-8x22b',
+            'meta-llama/llama-3.1-70b-instruct',
           ]).slice(0, 10);
     const chairmanModel =
       (typeof modelCfg.chairman_model === 'string' && modelCfg.chairman_model) ||
       'openai/gpt-5.2-chat';
+
+    // Log the models being used for debugging
+    console.log('Using council models:', councilModels);
+    console.log('Using chairman model:', chairmanModel);
+
+    // Test API connectivity by trying to get available models
+    try {
+      const testResponse = await fetch('https://openrouter.ai/api/v1/models', {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
+      });
+      if (!testResponse.ok) {
+        console.error('API key test failed:', testResponse.status, await testResponse.text());
+      } else {
+        console.log('API key test passed');
+      }
+    } catch (error) {
+      console.error('API connectivity test failed:', error.message);
+    }
 
     // Conversation context (Stage 3-only history is built client-side)
     const rawConversationContext = body.conversation_context;
@@ -248,7 +285,7 @@ export default async function handler(req, res) {
     if (stage1Results.length === 0) {
       sseEvent(res, {
         type: 'error',
-        message: 'All models failed to respond. Please try again.',
+        message: `All ${councilModels.length} council models failed to respond. Please check your API key and try again. If the issue persists, try selecting different models in Model Settings.`,
       });
       res.end();
       return;
