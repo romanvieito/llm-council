@@ -85,15 +85,28 @@ async function queryOpenRouter({ apiKey, model, messages, timeoutMs = 120_000 })
 
     if (!resp.ok) {
       const text = await resp.text().catch(() => '');
-      throw new Error(text || `OpenRouter error (${resp.status})`);
+      console.error(`Model ${model} failed with status ${resp.status}:`, text);
+      throw new Error(`HTTP ${resp.status}: ${text || 'Unknown error'}`);
     }
 
     const data = await resp.json();
     const message = data?.choices?.[0]?.message;
+
+    if (!message || !message.content) {
+      console.error(`Model ${model} returned invalid response:`, data);
+      throw new Error('Invalid response format from model');
+    }
+
     return {
-      content: message?.content ?? '',
-      reasoning_details: message?.reasoning_details,
+      content: message.content,
+      reasoning_details: message.reasoning_details,
     };
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      console.error(`Model ${model} timed out after ${timeoutMs}ms`);
+      throw new Error(`Request timeout after ${timeoutMs}ms`);
+    }
+    throw error;
   } finally {
     clearTimeout(timeout);
   }
@@ -178,17 +191,19 @@ export default async function handler(req, res) {
       (Array.isArray(modelCfg.council_models) && modelCfg.council_models.length > 0
         ? modelCfg.council_models
         : [
-            'x-ai/grok-4.1-fast',
+            // Most reliable models based on OpenRouter benchmarks
+            'deepseek/deepseek-v3.2',
+            'anthropic/claude-sonnet-4',
             'openai/gpt-5.2-chat',
-            'anthropic/claude-haiku-4.5',
             'google/gemini-3-flash-preview',
-            // Fallback models that should be more widely available
-            'microsoft/wizardlm-2-8x22b',
+            // Additional reliable fallbacks
+            'minimax/minimax-01',
+            'nvidia/nemotron-4-340b-instruct',
             'meta-llama/llama-3.1-70b-instruct',
           ]).slice(0, 10);
     const chairmanModel =
       (typeof modelCfg.chairman_model === 'string' && modelCfg.chairman_model) ||
-      'openai/gpt-5.2-chat';
+      'deepseek/deepseek-v3.2';
 
     // Log the models being used for debugging
     console.log('Using council models:', councilModels);
@@ -202,12 +217,25 @@ export default async function handler(req, res) {
         },
       });
       if (!testResponse.ok) {
-        console.error('API key test failed:', testResponse.status, await testResponse.text());
+        const errorText = await testResponse.text();
+        console.error('API key test failed:', testResponse.status, errorText);
+        sseEvent(res, {
+          type: 'error',
+          message: `API key authentication failed (${testResponse.status}). Please check your OpenRouter API key in Model Settings.`,
+        });
+        res.end();
+        return;
       } else {
         console.log('API key test passed');
       }
     } catch (error) {
       console.error('API connectivity test failed:', error.message);
+      sseEvent(res, {
+        type: 'error',
+        message: 'Unable to connect to OpenRouter API. Please check your internet connection and try again.',
+      });
+      res.end();
+      return;
     }
 
     // Conversation context (Stage 3-only history is built client-side)
