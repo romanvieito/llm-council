@@ -113,6 +113,17 @@ export default function ChatInterface({
                     </div>
                   )}
                   {msg.stage3 && <Stage3 finalResponse={msg.stage3} />}
+
+                  {/* Error display */}
+                  {msg.error && (
+                    <div className="error-message">
+                      <div className="error-icon">⚠️</div>
+                      <div className="error-content">
+                        <div className="error-title">Stream Error</div>
+                        <div className="error-text">{msg.error}</div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

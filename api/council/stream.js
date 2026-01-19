@@ -164,14 +164,14 @@ export default async function handler(req, res) {
       (Array.isArray(modelCfg.council_models) && modelCfg.council_models.length > 0
         ? modelCfg.council_models
         : [
-            'openai/gpt-5.1',
-            'google/gemini-3-pro-preview',
-            'anthropic/claude-sonnet-4.5',
-            'x-ai/grok-4',
+            'x-ai/grok-4.1-fast',
+            'openai/gpt-5.2-chat',
+            'anthropic/claude-haiku-4.5',
+            'google/gemini-3-flash-preview',
           ]).slice(0, 10);
     const chairmanModel =
       (typeof modelCfg.chairman_model === 'string' && modelCfg.chairman_model) ||
-      'google/gemini-3-pro-preview';
+      'openai/gpt-5.2-chat';
 
     // Conversation context (Stage 3-only history is built client-side)
     const rawConversationContext = body.conversation_context;

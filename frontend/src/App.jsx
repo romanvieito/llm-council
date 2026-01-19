@@ -287,7 +287,7 @@ function App() {
 
           case 'error':
             console.error('Stream error:', event.message);
-            // Ensure we clear any stage spinners on error.
+            // Ensure we clear any stage spinners on error and display the error.
             setCurrentConversation((prev) => {
               if (!prev) return prev;
               const messages = [...prev.messages];
@@ -297,6 +297,8 @@ function App() {
                 lastMsg.loading.stage2 = false;
                 lastMsg.loading.stage3 = false;
               }
+              // Store the error message in the message for display
+              lastMsg.error = event.message;
               return { ...prev, messages };
             });
             setIsLoading(false);
